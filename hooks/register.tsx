@@ -322,8 +322,8 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'masterskaya',
-      description: 'Открыть мастерскую или сменить команду: стандартная, Гарри Поттер, Мстители',
-      argumentHint: '[стандарт | поттер | марвел]',
+      description: 'Открыть мастерскую или сменить команду: стандартная, Гарри Поттер, Мстители, Лига Справедливости, Игра престолов',
+      argumentHint: '[стандарт | поттер | марвел | dc | престолы]',
     })
     const saved = (await $.store.get('team')) as Team | undefined
     if (saved && saved in TEAMS) setTeam(saved)
@@ -363,7 +363,7 @@ export const register: Register = on => {
   on('command.run', { command: 'masterskaya' }, async ($, e) => {
     if (e.args.trim()) {
       const t = teamOf(e.args)
-      if (!t) return { text: 'Такой команды нет. Есть: ' + Object.values(TEAMS).join(', ') + ' (/masterskaya 1, 2 или 3).' }
+      if (!t) return { text: 'Такой команды нет. Есть: ' + Object.values(TEAMS).join(', ') + ' (/masterskaya 1–5).' }
       await pickTeam($, t)
       return { text: 'Команда: ' + TEAMS[t] + '.' }
     }

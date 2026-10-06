@@ -258,3 +258,26 @@ test('сабагент сдал работу — постоял с галочк�
   await clock.advance(1400) // убежал — пропал
   expect(await named()).toBeUndefined()
 })
+
+test('ещё две вселенные: Лига Справедливости и Игра престолов — свои менеджеры, исполнители и слова', async ($, on) => {
+  const store = new Map<string, unknown>()
+  const seen: Record<string, (string | undefined)[]> = {}
+  let label = ''
+  on('ui.invalidate', () => ({ value: undefined }) as never)
+  on('store.set', (_, e) => (store.set((e as { key: string }).key, (e as { value: unknown }).value), { value: undefined }))
+  on('tool.call', async () => {
+    const ui = await $.ui.mount({ ...BAND, props: { ...BAND.props, bodyColumns: 160 } } as never)
+    const find = async (re: RegExp) => (await ui.find({ type: 'Text', text: re }))?.text
+    seen[label] = [await find(/^(Бэтмен|Дейенерис)$/), await find(/^(Супермен|Джон Сноу)$/), await find(/(разгоняет|рубит): ls/)]
+    await ui.unmount()
+    return { result: 'ok' }
+  })
+  label = 'dc'
+  expect((await $.command.run({ command: 'masterskaya', args: 'dc' } as never)).text).toBe('Команда: Лига Справедливости.')
+  await $.tool.call({ tool: 'Bash', command: 'ls' })
+  label = 'got'
+  expect((await $.command.run({ command: 'masterskaya', args: 'престолы' } as never)).text).toBe('Команда: Игра престолов.')
+  await $.tool.call({ tool: 'Bash', command: 'ls' })
+  expect(seen.dc).toEqual(['Бэтмен', 'Супермен', 'разгоняет: ls'])
+  expect(seen.got).toEqual(['Дейенерис', 'Джон Сноу', 'рубит: ls'])
+})

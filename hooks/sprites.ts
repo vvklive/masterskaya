@@ -81,6 +81,30 @@ const PROPS: Record<Exclude<Prop, 'bubble' | 'zzz'>, string[]> = {
   blaster: ['', '', 'GGGGG', 'GKGGG', '.K...', '.K...'],
   bow: ['', '..H.', '.H.W', 'H..W', '.H.W', '..H.'],
   firework: ['', 'R.Y.R', '.YRY.', 'R.Y.R', '..H..', '.H...'], // «Волшебные вредилки Уизли»
+  batarang: ['', '', 'D...D', 'DDDDD', '.D.D.'],
+  heat: ['', '', '', 'RRRRRR'], // лучи из глаз на уровне глаз
+  lasso: ['', '.YYY.', 'Y...Y', '.YYY.', '..Y..', '.Y...'], // лассо правды
+  bolt: ['', '...Y', '..Y.', '.YYY', '..Y.', '.Y..'],
+  card: ['', '', 'WWW', 'WRW', 'WgW', 'WWW'], // карта-джокер
+  bat: ['', '...HH', '..HH.', '.H...', 'H....'],
+  staff: ['', '....D', '...D.', '..D..', '.D...', 'D....'],
+  lantern: ['', '', '.ggg.', 'gWWWg', 'gWWWg', '.ggg.', '..g..'],
+  trident: ['', 'Y.Y.Y', 'YYYYY', '..Y..', '..Y..', '..Y..'],
+  tray: ['', '', '', '.WW..', 'GGGGG'], // поднос с чаем
+  kryptonite: ['', '', '..g.', '.ggg', 'gggg', '.gg.'],
+  cane: ['', '.YY.', 'Y..Y', '...Y', '..Y.', '..Y.', '..Y.'], // трость-вопрос
+  dragon: ['', '...RR', 'R.RRY', 'RRRR.', '.RR..', 'R.R..'], // дракончик на руке
+  sword: ['', '....W', '...W.', '..W..', '.YK..', 'K....'], // Длинный Коготь
+  needle: ['', '', '....W', '...W.', '..W..', '.K...'], // Игла
+  greatsword: ['', '...WW', '..WW.', '.WW..', 'YK...', 'K....'], // Лёд
+  hoop: ['', '', '.HHH.', 'H.R.H', 'H.R.H', '.HHH.'], // пяльцы
+  door: ['', 'HHHH', 'HHHH', 'HHKH', 'HHHH', 'HHHH', 'HHHH'], // «Держи дверь»
+  flame: ['', '..Y..', '.YRY.', '.RYR.', 'RRYRR', '.RRR.'],
+  raven: ['', '', '..DD', '.DDDY', 'DDDD.', '.D.D.'], // трёхглазый ворон
+  scroll: ['', '', 'HbbbbH', '.bKKb.', '.bbbb.', 'HbbbbH'],
+  goblet: ['', '', '', 'GRRG', 'GRRG', '.GG.', 'GGGG'], // кубок вина
+  icespear: ['', '....L', '...L.', '..L..', '.L...', 'L....'],
+  ladder: ['', 'H..H', 'HHHH', 'H..H', 'HHHH', 'H..H'], // «хаос — это лестница»
 }
 
 type Px = (number | null)[][]
@@ -189,6 +213,72 @@ const MOTION: Partial<Record<Prop, [number, number][]>> = {
     [-1, 0],
     [1, 0],
   ], // натянул и выстрелил
+  batarang: [
+    [0, 0],
+    [2, -1],
+    [4, 0],
+    [2, 1],
+  ], // бросок и возврат
+  lasso: [
+    [0, -1],
+    [1, 0],
+    [0, 1],
+    [-1, 0],
+  ], // раскручивает
+  sword: [
+    [0, -1],
+    [1, 0],
+    [2, 1],
+    [0, 0],
+  ],
+  needle: [
+    [0, 0],
+    [2, 0],
+    [0, 0],
+    [2, 0],
+  ], // уколы
+  greatsword: [
+    [0, -1],
+    [1, 0],
+    [2, 1],
+    [0, 0],
+  ],
+  trident: [
+    [0, 0],
+    [2, 0],
+    [1, 0],
+    [0, 0],
+  ],
+  icespear: [
+    [0, 0],
+    [2, 0],
+    [1, 0],
+    [0, 0],
+  ],
+  staff: [
+    [0, -1],
+    [1, 0],
+    [2, 1],
+    [1, 0],
+  ],
+  bat: [
+    [0, -1],
+    [1, 0],
+    [2, 1],
+    [0, 0],
+  ],
+  dragon: [
+    [0, 0],
+    [0, -1],
+    [1, -1],
+    [0, 0],
+  ], // вспархивает
+  raven: [
+    [0, 0],
+    [0, -1],
+    [0, 0],
+    [0, -1],
+  ],
   blaster: [
     [0, 0],
     [-1, 0],
@@ -285,6 +375,10 @@ export function frame(role: RoleKey, status: Status, t: number, body: number = P
     if (prop === 'spark') swap = t % 2 ? { Y: PAL.R, R: PAL.Y } : undefined // мандала крутится
     if (prop === 'cube') swap = { W: t % 2 ? PAL.L : PAL.W }
     if (prop === 'firework') swap = t % 2 ? { R: PAL.Y, Y: PAL.P } : undefined // искрит
+    if (prop === 'heat' || prop === 'flame') swap = t % 2 ? { R: PAL.Y, Y: PAL.R } : undefined // жар
+    if (prop === 'bolt') swap = { Y: t % 2 ? PAL.W : PAL.Y }
+    if (prop === 'lantern') swap = { W: t % 2 ? PAL.g : PAL.W } // кольцо заряжается
+    if (prop === 'kryptonite' || prop === 'icespear') swap = t % 2 ? { g: PAL.W, L: PAL.W } : undefined // свечение
     if (prop === 'repulsor') swap = { L: t % 2 ? PAL.W : PAL.L } // луч пульсирует
     if (prop === 'phoenix') swap = t % 4 < 2 ? { Y: PAL.R, R: PAL.Y } : undefined // перья вспыхивают
     const m = MOTION[prop]
@@ -326,8 +420,8 @@ type Art = {
   BALL: string[]
   JUGGLE: PalKey[]
   BLOOM: PalKey // чем цветёт цветок
-  FLY: 'balloon' | 'broom' | 'jets'
-  ARRIVE: 'run' | 'apparate' | 'fly' // как приходят в полосу и уходят из неё
+  FLY: 'balloon' | 'broom' | 'jets' | 'cape' | 'dragon'
+  ARRIVE: 'run' | 'apparate' | 'fly' | 'speed' | 'snow' // как приходят в полосу и уходят из неё
 }
 const BASE: Art = { DRUM, MUG, NEWS, NEWS_NEXT, PHONE, CONSOLE, BALL, JUGGLE: ['R', 'Y', 'g'], BLOOM: 'P', FLY: 'balloon', ARRIVE: 'run' }
 const ART: Record<Team, Partial<Art>> = {
@@ -354,6 +448,26 @@ const ART: Record<Team, Partial<Art>> = {
     BLOOM: 'g', // малыш Грут
     FLY: 'jets',
     ARRIVE: 'fly',
+  },
+  dc: {
+    DRUM: ['YYYYY', '.YRY.', '..Y..'], // пицца
+    MUG: ['WWW.', 'WWWW', 'WWW.'], // чай от Альфреда
+    NEWS: ['BBBBBBB', 'bKKbKKb', 'bbbbbbb', 'bKbKKbb', 'bbbbbbb', 'bKKbbKb'], // «Дейли Плэнет»
+    NEWS_NEXT: ['BBBBBBB', 'bKbKKbb', 'bbbbbbb', 'bKKbbKb', 'bbbbbbb', 'bKKbKKb'],
+    BALL: ['D.D', '.D.'], // бэтаранг
+    JUGGLE: ['D', 'Y', 'D'],
+    BLOOM: 'g', // цветы Ядовитого Плюща
+    FLY: 'cape',
+    ARRIVE: 'speed',
+  },
+  got: {
+    MUG: ['GRRG', 'GRRG', '.GG.'], // кубок вина
+    CONSOLE: ['GKGKG', 'KGKGK'], // кайвасса
+    BALL: ['W.', '.W'], // блеск стали
+    JUGGLE: ['R', 'g', 'Y'], // яйца драконов
+    BLOOM: 'R', // красные листья чардрева
+    FLY: 'dragon',
+    ARRIVE: 'snow',
   },
 }
 const art = (): Art => ({ ...BASE, ...ART[team()] })
@@ -507,6 +621,20 @@ function rest(px: Px, r: Role, t: number, body: number, scene: Scene): Px {
         // сидит на метле, метла покачивается
         drawBody(px, r, body, { sink: by ? -1 : 0 })
         stamp(px, ['.Y', 'YYHHHHHHHHHHH', '.Y'], 0, by ? 5 : 6) // прутья сзади, древко между ног
+        return px
+      }
+      if (FLY === 'cape') {
+        // летит кулаком вперёд, плащ полощется позади
+        drawBody(px, r, body, { sink: -1, arms: 'right' })
+        for (let y = 1; y <= 3 + by; y++) dot(px, 1 - ((y + t) % 2), y, PAL.R)
+        return shift(px, by)
+      }
+      if (FLY === 'dragon') {
+        // верхом на драконе, крылья машут
+        drawBody(px, r, body, { sink: -1 })
+        stamp(px, ['RRRRRRRRRRRRR'], 0, 7)
+        stamp(px, ['RR', '.RY'], 12, 5) // голова
+        stamp(px, by ? ['RR', 'R.'] : ['R.', 'RR'], 0, by ? 4 : 5) // крыло
         return px
       }
       if (FLY === 'jets') {
@@ -706,6 +834,41 @@ export function pose(role: RoleKey, status: Status, t: number, body?: number, m?
     const e = 1 - easeOut(q) // остаток пути: прилетает справа сверху и садится
     return shift(lift(px, Math.round(3 * e)), Math.round(SPRITE_COLS * e))
   }
+  if (style === 'speed') {
+    // молния: проносится за треть секунды, позади жёлто-красный след, потом искрит
+    if (k < 0.05) return still()
+    if (m.out && q < 0.12) {
+      drawBody(px, r, b, { sink: 1, eyes: LOOK_RIGHT })
+      return px
+    }
+    const p = m.out ? Math.min(1, (q - 0.12) / 0.35) : Math.min(1, q / 0.35)
+    if (p >= 1 && m.out) return px
+    if (p >= 1) {
+      const f = still()
+      if (q < 0.7) for (const [x, y] of [[11, 1 + beat], [0, 3 - beat], [12, 6]] as const) dot(f, x, y, PAL.Y)
+      return f
+    }
+    drawBody(px, r, b, { step: beat === 1, eyes: m.out ? LOOK_RIGHT : LOOK_LEFT })
+    const dx = Math.round(SPRITE_COLS * (m.out ? p : 1 - p))
+    const moved = shift(px, dx)
+    const [from, to] = m.out ? [0, dx] : [11 + dx, W - 1]
+    for (let x = from; x <= to; x++) {
+      if ((x + beat) % 3) dot(moved, x, 3, PAL.Y)
+      if ((x + beat) % 2) dot(moved, x, 5, PAL.R)
+    }
+    return moved
+  }
+  const ran = runPose(px, r, b, m, q, beat)
+  if (style === 'snow') {
+    // идут сквозь метель: «Зима близко»
+    const tick = Math.floor(Date.now() / 160)
+    for (let i = 0; i < 6; i++) dot(ran, (i * 7 + tick) % W, (i * 3 + tick) % H, PAL.W)
+  }
+  return ran
+}
+
+/** Бег: прибегает справа и тормозит, убегает вправо с разгона. */
+function runPose(px: Px, r: Role, b: number, m: Move, q: number, beat: number): Px {
   const span = m.span ?? SPRITE_COLS
   if (m.out) {
     if (q < 0.12) {
