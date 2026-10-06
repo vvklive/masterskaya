@@ -1,5 +1,5 @@
 // Лист кадров: все роли за работой, по 4 фазы, в PNG. node dev/sheet.mjs out.png [standard|potter|marvel] [rest]
-// rest — досуг: занятия по строкам, ведущий персонаж команды; move — приход и уход: строки по командам, кадры по времени
+// rest — досуг: занятия по строкам, ведущий персонаж команды; move — приход и уход: строки по командам, кадры по времени; guests — гости-сабагенты команды
 // Бандлит hooks/sprites.ts через esbuild и рисует пиксели кадра (без Chrome).
 import { execFileSync } from 'node:child_process'
 import { writeFileSync, mkdtempSync } from 'node:fs'
@@ -16,6 +16,7 @@ const MS = await import(js)
 MS.setTeam(process.argv[3] || 'standard')
 const ROLES = ['foreman', 'mechanic', 'researcher', 'scout', 'writer', 'designer', 'apprentice', 'artist', 'librarian', 'editor', 'planner', 'done']
 const move = process.argv[4] === 'move'
+const guests = process.argv[4] === 'guests'
 const PH = move ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] : [0, 2, 4, 6], S = 8, CW = 22, CH = 10
 const W = PH.length * CW * S, H = ROLES.length * CH * S
 const img = Buffer.alloc(W * H * 3, 0xff)
@@ -23,9 +24,11 @@ const MOVES = [['standard', false], ['standard', true], ['potter', false], ['pot
 const REST = ['eat', 'coffee', 'read', 'phone', 'game', 'balloon', 'plant', 'juggle', 'ball', 'gym', 'music', 'paint']
 const rest = process.argv[4] === 'rest'
 ROLES.forEach((r, ry) => PH.forEach((t, cx) => {
-  if (move && ry >= MOVES.length) return
+  if ((move && ry >= MOVES.length) || (guests && ry >= 6)) return
   if (move) MS.setTeam(MOVES[ry][0])
-  const px = move
+  const px = guests
+    ? MS.frame('guest' + ry, t === 6 ? 'think' : 'work', t, MS.bodyColor(ry))
+    : move
     ? MS.pose('mechanic', 'work', t, undefined, { out: MOVES[ry][1], q: t / 9 })
     : rest
     ? MS.frame('mechanic', 'idle', t * 2 + 4, undefined, { pastime: REST[ry], leads: true, tt: t * 2 })

@@ -1,10 +1,10 @@
-import type { RoleKey } from '../types'
+import type { RoleKey, Worker } from '../types'
 
 export type Hat = 'hardhat' | 'detective' | 'beret' | 'cap' | 'wizard' | 'hair' | 'horns' | 'none'
 export type Prop =
   | 'wrench' | 'magnifier' | 'pencil' | 'binoculars' | 'brush' | 'palette' | 'megaphone' | 'book' | 'laptop' | 'bubble' | 'zzz' | 'check'
   | 'wand' | 'snitch' | 'sock' | 'shield' | 'spark' | 'web' | 'quill' | 'cube' | 'snake' | 'umbrella' | 'hammer' | 'gauntlet' | 'sprout'
-  | 'phoenix' | 'repulsor'
+  | 'phoenix' | 'repulsor' | 'katana' | 'walkman' | 'blaster' | 'bow' | 'firework'
 
 export type Role = {
   label: string
@@ -23,6 +23,8 @@ export type Role = {
  * paint перекрашивает только само тело (лицо, эмблема, полосы), over рисуется поверх всего (волосы, борода, уши, маска).
  */
 export type Look = { pal: Record<string, number>; paint?: string[]; over?: string[]; legs?: number; eyes?: number }
+
+const THINKER: Role = { label: 'Думает', inst: 'помощником', color: '#D97757', hat: 'none', hatColor: 0, glasses: false, prop: 'bubble' }
 
 const STANDARD: Record<RoleKey, Role> = {
   mechanic: { label: 'Механик', inst: 'механиком', color: '#F2C230', hat: 'hardhat', hatColor: 0xf2c230, glasses: false, prop: 'wrench' },
@@ -52,7 +54,14 @@ const STANDARD: Record<RoleKey, Role> = {
   librarian: { label: 'Библиотекарь', inst: 'библиотекарем', color: '#9FB4D8', hat: 'none', hatColor: 0, glasses: true, prop: 'book' },
   planner: { label: 'Планировщик', inst: 'планировщиком', color: '#9FB4D8', hat: 'cap', hatColor: 0x3b4a8c, glasses: false, prop: 'book' },
   apprentice: { label: 'Подмастерье', inst: 'подмастерьем', color: '#D97757', hat: 'none', hatColor: 0, glasses: false, prop: 'laptop' },
-  thinker: { label: 'Думает', inst: 'помощником', color: '#D97757', hat: 'none', hatColor: 0, glasses: false, prop: 'bubble' },
+  thinker: THINKER,
+  // гости — сабагенты тематических команд; в стандартной сабагент меняет профессию под инструмент и гостем не бывает
+  guest0: THINKER,
+  guest1: THINKER,
+  guest2: THINKER,
+  guest3: THINKER,
+  guest4: THINKER,
+  guest5: THINKER,
   idle: { label: 'Отдыхает', inst: 'менеджером', color: '#8A8A8A', hat: 'hardhat', hatColor: 0xefefef, glasses: false, prop: 'zzz' },
   done: { label: 'Сдал работу', inst: 'помощником', color: '#5FB37A', hat: 'none', hatColor: 0, glasses: false, prop: 'check' },
 }
@@ -144,6 +153,37 @@ const CASTS: Record<Team, Cast> = {
       eyes: 0x3fae5a,
       over: ['', '.s........s.', '.s.w....w.s.', '.s........s.'], // уши и глаза-мячики
       pal: { s: 0x9ea67e, w: 0xf2f2f2 },
+    }),    // сабагенты
+    guest0: who('Сириус Блэк', 'Сириусом Блэком', '#9FB4D8', 0x4a3b30, 'wand', {
+      paint: [...FACE, '.....kk.....'], // бородка
+      legs: 0x3a3a42,
+      over: ['', '..hhhhhhhh..', '.hhhhhhhhhh.', '.hh......hh.', '.h........h.'],
+      pal: { h: 0x463a32, k: 0x463a32 },
+    }),
+    guest1: who('Джинни Уизли', 'Джинни Уизли', '#E0823D', ROBE, 'wand', {
+      paint: [...FACE, '....wraw....'],
+      over: ['', '..hhhhhhhh..', '.hhhhhhhhhh.', '.h........h.', '.h........h.', '.h........h.', '.h........h.'],
+      pal: { h: 0xd2691e, w: 0xf2f2f2, r: 0xb0302a, a: 0xe0b040 },
+    }),
+    guest2: who('Невилл', 'Невиллом', '#C08A57', ROBE, 'sprout', {
+      paint: [...FACE, '....wraw....'],
+      over: ['', '..hhhhhhhh..', '.h........h.'],
+      pal: { h: 0x6b4a2e, w: 0xf2f2f2, r: 0xb0302a, a: 0xe0b040 },
+    }),
+    guest3: who('Беллатриса', 'Беллатрисой', '#B8C0CC', 0x3a3a44, 'wand', {
+      paint: FACE,
+      over: ['..h.hh.hh...', '.hhhhhhhhhh.', '.hhhhhhhhhh.', '.hh......hh.', '.hh......hh.', '.h.h....h.h.'], // безумная копна
+      pal: { s: 0xe8e4dc, h: 0x453c45 },
+    }),
+    guest4: who('Фред Уизли', 'Фредом Уизли', '#E0823D', 0x2f4f8f, 'firework', {
+      paint: [...FACE, '....yyy.....', '....y.......'], // свитер с буквой F
+      over: ['', '..hhhhhhhh..', '.hhhhhhhhhh.', '.h........h.'],
+      pal: { h: 0xd2691e, y: 0xf2c230 },
+    }),
+    guest5: who('Джордж Уизли', 'Джорджем Уизли', '#E0823D', 0x2f4f8f, 'firework', {
+      paint: [...FACE, '....yyy.....', '....y.yy....'], // свитер с буквой G
+      over: ['', '..hhhhhhhh..', '.hhhhhhhhhh.', '.h........h.'],
+      pal: { h: 0xd2691e, y: 0xf2c230 },
     }),
   },
   marvel: {
@@ -207,6 +247,39 @@ const CASTS: Record<Team, Cast> = {
       eyes: 0xe6e6e6,
       over: ['', '', '....k.......', '..kkk.......'], // повязка на левом глазу
       pal: { s: 0x5a3825, k: 0x111111 },
+    }),    // сабагенты
+    guest0: who('Дэдпул', 'Дэдпулом', '#E5484D', 0xb3261e, 'katana', {
+      legs: 0x2b2b2b,
+      eyes: 0xf2f2f2,
+      over: ['..k......k..', '..k......k..', '', '..k.k..k.k..'], // рукояти катан за спиной, чёрные пятна маски
+      pal: { k: 0x1b1b1b },
+    }),
+    guest1: who('Звёздный Лорд', 'Звёздным Лордом', '#E0823D', 0x8b2e2e, 'walkman', {
+      paint: FACE,
+      legs: 0x5a4636,
+      over: ['', '.khhhhhhhhk.', '.kh......hk.'], // наушники поверх волос
+      pal: { h: 0x8b5a2b, k: 0x1b1b1b },
+    }),
+    guest2: who('Ракета', 'Ракетой', '#C08A57', 0x4a5a7a, 'blaster', {
+      paint: ['', '', '..ffffffff..', '..kkkkkkkk..'], // мех и тёмная маска енота
+      eyes: 0xf2f2f2,
+      over: ['', '..f......f..'],
+      pal: { f: 0x9a8268, k: 0x3a2e24 },
+    }),
+    guest3: who('Соколиный глаз', 'Соколиным глазом', '#A98BEF', 0x4a3a6b, 'bow', {
+      paint: FACE,
+      over: ['', '..hhhhhhhh..', '..h......h..'],
+      pal: { h: 0xb08a5a },
+    }),
+    guest4: who('Вижн', 'Вижном', '#5FB37A', 0x2e7d4a, 'bubble', {
+      paint: FACE,
+      over: ['', '', '.....yy.....', '.c........c.', '.c........c.', '.c........c.'], // Камень разума, жёлтый плащ
+      pal: { s: 0xc0392b, y: 0xf2c230, c: 0xd4a017 },
+    }),
+    guest5: who('Капитан Марвел', 'Капитаном Марвел', '#E5484D', 0x2f4f9f, 'repulsor', {
+      paint: [...FACE, '.....yy.....', '..rrrrrrrr..'],
+      over: ['', '..hhhhhhhh..', '.hh......hh.', '.h........h.', '.h........h.'],
+      pal: { h: 0xf2d04a, y: 0xf2c230, r: 0xc0392b },
     }),
   },
 }
@@ -329,6 +402,14 @@ const PHRASES: Record<Team, [string, string][]> = {
 export function say(action: string): string {
   for (const [from, to] of PHRASES[current]) if (action.startsWith(from)) return to + action.slice(from.length)
   return action
+}
+
+export const GUESTS = ['guest0', 'guest1', 'guest2', 'guest3', 'guest4', 'guest5'] as const
+
+/** Кем нарисован работник: в тематической команде сабагент — свой гость вселенной, остальные — по профессии. */
+export function face(w: Worker): RoleKey {
+  const guest = w.isSub && !w.id.startsWith('crew-') && current !== 'standard'
+  return guest ? GUESTS[(w.cast ?? 0) % GUESTS.length]! : w.role
 }
 
 /** Команда по тому, что набрали после /masterskaya: номер, имя или вселенная. */

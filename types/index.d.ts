@@ -1,6 +1,7 @@
 export type RoleKey =
   | 'mechanic' | 'researcher' | 'editor' | 'writer' | 'scout' | 'designer' | 'artist'
   | 'foreman' | 'librarian' | 'planner' | 'apprentice' | 'thinker' | 'idle' | 'done'
+  | 'guest0' | 'guest1' | 'guest2' | 'guest3' | 'guest4' | 'guest5' // сабагенты в тематических командах
 
 export type Status = 'work' | 'think' | 'idle' | 'done'
 
@@ -18,6 +19,7 @@ export type Worker = {
   pastimeUntil?: number
   partner?: string
   leads?: boolean // в паре стоит левее и начинает (подаёт мяч, заговаривает первым)
+  cast?: number // каким из гостей команды нарисован сабагент (0–5)
 }
 
 export type Pastime =

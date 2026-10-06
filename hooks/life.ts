@@ -1,6 +1,6 @@
 // Свободное время команды: кто из отдыхающих чем займётся и с кем.
 import type { Pastime, Worker } from '../types'
-import { ROLES } from './roles'
+import { ROLES, face } from './roles'
 
 const SOLO: Pastime[] = [
   'sleep',
@@ -45,7 +45,7 @@ const SOLO_LABEL: Record<Exclude<Pastime, 'chat' | 'ball'>, string> = {
 }
 
 export function label(p: Pastime, mate?: Worker): string {
-  const inst = mate ? ROLES[mate.role].inst : 'соседом'
+  const inst = mate ? ROLES[face(mate)].inst : 'соседом'
   if (p === 'chat') return 'болтает с ' + inst
   if (p === 'ball') return 'играет в мяч с ' + inst
   return SOLO_LABEL[p]

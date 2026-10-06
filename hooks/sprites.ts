@@ -76,6 +76,11 @@ const PROPS: Record<Exclude<Prop, 'bubble' | 'zzz'>, string[]> = {
   sprout: ['', '', '.g.g', '..g.', '..H.', '..H.'],
   phoenix: ['', '..RY', '.RRR', 'RRRR', 'YRR.', '.Y..'], // Фоукс на руке
   repulsor: ['', '', '', 'L', 'WLLLL', 'L'], // луч из ладони
+  katana: ['', '....W', '...W.', '..W..', '.K...', 'K....'],
+  walkman: ['', '', '', 'GGG', 'GBG', 'GGG'], // плеер с «Потрясным миксом»
+  blaster: ['', '', 'GGGGG', 'GKGGG', '.K...', '.K...'],
+  bow: ['', '..H.', '.H.W', 'H..W', '.H.W', '..H.'],
+  firework: ['', 'R.Y.R', '.YRY.', 'R.Y.R', '..H..', '.H...'], // «Волшебные вредилки Уизли»
 }
 
 type Px = (number | null)[][]
@@ -172,6 +177,24 @@ const MOTION: Partial<Record<Prop, [number, number][]>> = {
     [0, 0],
     [1, 0],
   ],
+  katana: [
+    [0, -1],
+    [1, 0],
+    [2, 1],
+    [0, 0],
+  ], // взмах катаной
+  bow: [
+    [0, 0],
+    [-1, 0],
+    [-1, 0],
+    [1, 0],
+  ], // натянул и выстрелил
+  blaster: [
+    [0, 0],
+    [-1, 0],
+    [0, 0],
+    [0, 0],
+  ], // отдача
   wand: [
     [0, -1],
     [1, 0],
@@ -239,7 +262,7 @@ export function frame(role: RoleKey, status: Status, t: number, body: number = P
   const eyes = status === 'think' && t % 8 >= 4 ? (role === 'foreman' ? LOOK_RIGHT : LOOK_LEFT) : undefined
   drawBody(px, r, body, { step, eyes })
 
-  if (r.prop === 'bubble') {
+  if (r.prop === 'bubble' || (status === 'think' && role.startsWith('guest'))) {
     const n = t % 4
     if (n >= 1) dot(px, 11, 3, PAL.G)
     if (n >= 2) stamp(px, ['GG', 'GG'], 12, 1)
@@ -261,6 +284,7 @@ export function frame(role: RoleKey, status: Status, t: number, body: number = P
     if (prop === 'gauntlet') swap = { Y: t % 4 === 0 ? PAL.W : PAL.Y } // щелчок
     if (prop === 'spark') swap = t % 2 ? { Y: PAL.R, R: PAL.Y } : undefined // мандала крутится
     if (prop === 'cube') swap = { W: t % 2 ? PAL.L : PAL.W }
+    if (prop === 'firework') swap = t % 2 ? { R: PAL.Y, Y: PAL.P } : undefined // искрит
     if (prop === 'repulsor') swap = { L: t % 2 ? PAL.W : PAL.L } // луч пульсирует
     if (prop === 'phoenix') swap = t % 4 < 2 ? { Y: PAL.R, R: PAL.Y } : undefined // перья вспыхивают
     const m = MOTION[prop]

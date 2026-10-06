@@ -3,7 +3,7 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Worker } from '../types'
 import { plan } from './life'
-import { PREP, ROLES, TEAMS, roleOf, roleOfAgent, say, setTeam, summarize, team, teamOf } from './roles'
+import { GUESTS, PREP, ROLES, TEAMS, face, roleOf, roleOfAgent, say, setTeam, summarize, team, teamOf } from './roles'
 import type { Team } from './roles'
 import { SPRITE_COLS, SPRITE_ROWS, bodyColor, frameCells, frameSvg } from './sprites'
 import type { Move } from './sprites'
@@ -45,6 +45,7 @@ const fresh = (id: string, now: number): Worker => ({
   status: id === MAIN ? 'idle' : 'think',
   startedAt: now,
   isSub: id !== MAIN,
+  cast: id === MAIN || id.startsWith(CREW) ? undefined : freeCast(), // вернувшийся сабагент снова получает гостя
 })
 
 // Мастерская только смотрит: сбой анимации не должен ломать работу инструментов.
@@ -135,8 +136,17 @@ function stageFor($: EngineInterface, subs: Worker[], now: number): Worker[] {
   return show
 }
 
-/** Сабагент — только тот, кого завели через agent.spawn; служебные проходы движка (память, сжатие) тоже несут agentId, их не рисуем. */
-const known = (id: string): boolean => mirror.some(w => w.id === id)
+/** Сабагент — только тот, кого завели через agent.spawn; служебные проходы движка (память, сжатие) тоже несут agentId, их не рисуем.
+ *  Набор не чистится: ушедшего домой сабагента могут продолжить через SendMessage, тогда он прибегает снова. */
+const agents = new Set<string>()
+const known = (id: string): boolean => agents.has(id)
+
+/** Свободный гость команды для нового сабагента: двое одновременно одним персонажем не ходят, пока гостей хватает. */
+const freeCast = (): number => {
+  const taken = new Set(mirror.filter(w => w.isSub && !w.id.startsWith(CREW) && !w.leftAt).map(w => w.cast))
+  const n = GUESTS.findIndex((_, i) => !taken.has(i))
+  return n >= 0 ? n : taken.size % GUESTS.length
+}
 
 const busy = (list: Worker[]): boolean => list.some(w => w.isSub && !w.leftAt && (w.status === 'work' || w.status === 'think'))
 
@@ -147,6 +157,7 @@ let starAsk = false
 let thanksUntil = 0
 
 const shown = (w: Worker, list: Worker[]): Worker => {
+  if (w.isSub) return face(w) === w.role ? w : { ...w, role: face(w) }
   if (w.id === MAIN && Date.now() < thanksUntil)
     return { ...w, role: 'foreman', status: 'idle', pastime: 'dance', action: 'спасибо! команда пляшет' }
   if (w.id === MAIN && starAsk) return { ...w, role: 'foreman', status: 'idle', pastime: 'chat', leads: true, action: 'привет, это мы!' }
@@ -234,10 +245,13 @@ function makeRoom($: EngineInterface): void {
   const idle = mirror
     .filter(w => w.isSub && !w.leftAt && w.status === 'idle' && !(turnAt > 0 && since(w) >= turnAt))
     .sort((a, b) => since(a) - since(b))
-  for (const w of idle.slice(0, Math.max(0, idle.length - RESTING))) {
-    void patch($, w.id, { leftAt: Date.now(), action: 'уходит домой' })
-    $.clock.after(LEAVE_MS + 300, () => void drop($, w.id))
-  }
+  for (const w of idle.slice(0, Math.max(0, idle.length - RESTING))) sendHome($, w.id)
+}
+
+/** Уходит домой: убегает (трансгрессирует, улетает) и пропадает из списка. */
+function sendHome($: EngineInterface, id: string): void {
+  void patch($, id, { leftAt: Date.now(), action: 'уходит домой' })
+  $.clock.after(LEAVE_MS + 300, () => void drop($, id))
 }
 
 /** Сдал работу: постоял с галочкой и пошёл отдыхать, если за это время не позвали снова. */
@@ -318,8 +332,11 @@ export const register: Register = on => {
     // уходившие во время перезагрузки не застревают за краем; исполнители без своих таймеров — сразу отдыхать
     const kept = ((await read($, WORKERS)) ?? [])
       .filter(w => !w.leftAt)
+      // призраки служебных проходов движка: сабагент без гостя заведён не через agent.spawn
+      .filter(w => !w.isSub || w.id.startsWith(CREW) || w.cast !== undefined)
       .map(w => (w.id.startsWith(CREW) && w.status !== 'idle' ? { ...w, status: 'idle' as const, pastimeUntil: 0 } : w))
     mirror = kept.some(w => w.id === MAIN) ? kept : [fresh(MAIN, now), ...kept]
+    for (const w of mirror) if (w.cast !== undefined) agents.add(w.id)
     await update($, WORKERS, () => mirror)
     makeRoom($)
     $.clock.every(150, () => tick($))
@@ -366,9 +383,11 @@ export const register: Register = on => {
   on('agent.spawn', async ($, e, next) => {
     const res = await next(e)
     if ('agentId' in res && typeof res.agentId === 'string') {
+      agents.add(res.agentId)
       await patch($, res.agentId, {
         name: e.description || e.subagentType,
         role: roleOfAgent(e.subagentType),
+        cast: freeCast(),
         status: 'think',
         action: 'получил задание',
         isSub: true,
@@ -389,6 +408,7 @@ export const register: Register = on => {
       const id = e.agentId
       if (!known(id)) return next(e)
       lastCall.set(id, Date.now())
+      calls.set(id, (calls.get(id) ?? 0) + 1)
       await patch($, id, { role, status: 'work', action })
       const ran = await next(e)
       const w = mirror.find(x => x.id === id)
@@ -423,7 +443,11 @@ export const register: Register = on => {
       const id = e.agentId
       if (!known(id)) return res
       await patch($, id, { status: 'done', action: 'сдал работу' })
-      finish($, id, calls.get(id) ?? 0)
+      // сабагента больше не позовут (новый запуск — новый id): постоял с галочкой и ушёл домой, а не отдыхает в полосе
+      const n = calls.get(id) ?? 0
+      $.clock.after(DONE_MS, () => {
+        if ((calls.get(id) ?? 0) === n) sendHome($, id)
+      })
     } else {
       thought = ''
       thoughtDirty = true
@@ -594,10 +618,10 @@ export const register: Register = on => {
           </Box>
           {list.map((w, i) => (
             <Box key={w.id} flexDirection="row" alignItems="center" marginTop={1}>
-              <Svg source={svgOf(w, i, list, paneMove(w, Date.now()))} alt={`${ROLES[w.role].label}: ${say(w.action)}`} width={120} height={48} />
+              <Svg source={svgOf(w, i, list, paneMove(w, Date.now()))} alt={`${ROLES[face(w)].label}: ${say(w.action)}`} width={120} height={48} />
               <Box flexDirection="column" marginLeft={1}>
-                <Text bold color={ROLES[w.role].color}>
-                  {ROLES[w.role].label}
+                <Text bold color={ROLES[face(w)].color}>
+                  {ROLES[face(w)].label}
                 </Text>
                 <Text>{w.name}</Text>
                 <Text dimColor>{say(w.action)}</Text>
@@ -625,8 +649,8 @@ export const register: Register = on => {
           <Box key={w.id} flexDirection="row" marginTop={1}>
             <Raster key={'w-' + w.id} columns={SPRITE_COLS} rows={SPRITE_ROWS} cells={cellsOf(w, i, paneMove(w, Date.now()))} />
             <Box flexDirection="column" marginLeft={1} width={textWidth}>
-              <Text bold color={ROLES[w.role].color}>
-                {ROLES[w.role].label}
+              <Text bold color={ROLES[face(w)].color}>
+                {ROLES[face(w)].label}
               </Text>
               <Text bold wrap="truncate">
                 {w.name}

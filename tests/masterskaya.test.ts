@@ -1,4 +1,4 @@
-import { expect, test } from 'claude-code/testing'
+import { expect, mock, test } from 'claude-code/testing'
 
 const PANE = {
   plugin: 'masterskaya',
@@ -222,4 +222,39 @@ test('пока идёт задача, отработавший исполнит�
   expect((await ui.find({ type: 'Text', text: /^Исследователь$/ }))?.text).toBe('Исследователь')
   expect((await ui.find({ type: 'Text', text: /^Механик$/ }))?.text).toBe('Механик')
   await ui.unmount()
+})
+
+test('в тематической команде сабагенты — свои гости вселенной, двое одним персонажем не ходят', async ($, on) => {
+  const store = new Map<string, unknown>()
+  let n = 0
+  on('ui.invalidate', () => ({ value: undefined }) as never)
+  on('store.set', (_, e) => (store.set((e as { key: string }).key, (e as { value: unknown }).value), { value: undefined }))
+  on('agent.spawn', () => ({ agentId: 'a' + n++, model: 'm' }) as never)
+  await $.command.run({ command: 'masterskaya', args: 'марвел' } as never)
+  await $.agent.spawn({ prompt: 'найди', description: 'поиск', subagentType: 'general-purpose' } as never)
+  await $.agent.spawn({ prompt: 'проверь', description: 'проверка', subagentType: 'general-purpose' } as never)
+  const ui = await $.ui.mount({ ...BAND, props: { ...BAND.props, bodyColumns: 200 } } as never)
+  expect((await ui.find({ type: 'Text', text: /^Дэдпул$/ }))?.text).toBe('Дэдпул')
+  expect((await ui.find({ type: 'Text', text: /^Звёздный Лорд$/ }))?.text).toBe('Звёздный Лорд')
+  expect(await ui.find({ type: 'Text', text: /^Думает$/ })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('сабагент сдал работу — постоял с галочкой и ушёл домой, а не висит в полосе', async ($, on) => {
+  const clock = mock.clock(on)
+  on('agent.spawn', () => ({ agentId: 'once', model: 'm' }) as never)
+  on('ui.invalidate', () => ({ value: undefined }) as never)
+  on('turn.complete', () => ({ text: 'готово' }) as never)
+  await $.agent.spawn({ prompt: 'сделай', description: 'разовая задача', subagentType: 'general-purpose' } as never)
+  await $.turn.complete({ agentId: 'once', reason: 'answer', answer: 'готово', durationMs: 10, isAborted: false, turnId: 't1' } as never)
+  const named = async () => {
+    const ui = await $.ui.mount(PANE as never)
+    const found = (await ui.find({ type: 'Text', text: /разовая задача/ }))?.text
+    await ui.unmount()
+    return found
+  }
+  expect(await named()).toBe('разовая задача')
+  await clock.advance(1600) // постоял с галочкой — побежал домой
+  await clock.advance(1400) // убежал — пропал
+  expect(await named()).toBeUndefined()
 })
