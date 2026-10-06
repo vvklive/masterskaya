@@ -3,7 +3,8 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Worker } from '../types'
 import { plan } from './life'
-import { PREP, ROLES, roleOf, roleOfAgent, summarize } from './roles'
+import { PREP, ROLES, TEAMS, roleOf, roleOfAgent, setTeam, summarize, team, teamOf } from './roles'
+import type { Team } from './roles'
 import { SPRITE_COLS, SPRITE_ROWS, bodyColor, frameCells, frameSvg } from './sprites'
 
 const PANE = 'masterskaya'
@@ -27,6 +28,13 @@ const RESTING = 2 // работы нет — в полосе менеджер и
 const DONE_MS = 1500 // сколько сдавший работу стоит с галочкой, прежде чем пойти отдыхать
 
 const shortTool = (tool: string): string => (tool.startsWith('mcp__') ? tool.split('__').slice(1, 2).join('') : tool)
+
+/** Сменить команду: запоминается между сессиями, полоса и панель перерисовываются сразу. */
+async function pickTeam($: EngineInterface, t: Team): Promise<void> {
+  setTeam(t)
+  await $.store.set('team', t)
+  $.ui.invalidate('ui.render')
+}
 
 const fresh = (id: string, now: number): Worker => ({
   id,
@@ -226,14 +234,20 @@ async function prepare($: EngineInterface, tool: string, agentId?: string): Prom
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    await $.command.register({ name: 'masterskaya', description: 'Открыть мастерскую: маскоты Claude за работой' })
+    await $.command.register({
+      name: 'masterskaya',
+      description: 'Открыть мастерскую или сменить команду: стандартная, Гарри Поттер, Мстители',
+      argumentHint: '[стандарт | поттер | марвел]',
+    })
+    const saved = (await $.store.get('team')) as Team | undefined
+    if (saved && saved in TEAMS) setTeam(saved)
     const now = Date.now()
     // помощники, убегавшие во время перезагрузки, не должны застрять за краем
     // уходившие во время перезагрузки не застревают за краем; исполнители без своих таймеров — сразу отдыхать
-    const saved = ((await read($, WORKERS)) ?? [])
+    const kept = ((await read($, WORKERS)) ?? [])
       .filter(w => !w.leftAt)
       .map(w => (w.id.startsWith(CREW) && w.status !== 'idle' ? { ...w, status: 'idle' as const, pastimeUntil: 0 } : w))
-    mirror = saved.some(w => w.id === MAIN) ? saved : [fresh(MAIN, now), ...saved]
+    mirror = kept.some(w => w.id === MAIN) ? kept : [fresh(MAIN, now), ...kept]
     await update($, WORKERS, () => mirror)
     makeRoom($)
     $.clock.every(150, () => tick($))
@@ -256,7 +270,13 @@ export const register: Register = on => {
     }
   })
 
-  on('command.run', { command: 'masterskaya' }, async $ => {
+  on('command.run', { command: 'masterskaya' }, async ($, e) => {
+    if (e.args.trim()) {
+      const t = teamOf(e.args)
+      if (!t) return { text: 'Такой команды нет. Есть: ' + Object.values(TEAMS).join(', ') + ' (/masterskaya 1, 2 или 3).' }
+      await pickTeam($, t)
+      return { text: 'Команда: ' + TEAMS[t] + '.' }
+    }
     await $.ui.open({ id: PANE, title: 'Мастерская' })
     return { text: 'Мастерская открыта.' }
   })
@@ -484,9 +504,16 @@ export const register: Register = on => {
     if (e.surface !== 'terminal') {
       // приложение, панель VS Code, телефон: спрайты картинками SVG
       desktopSeen = true
-      const { Box, Text, Svg } = $.ui.resolve(e)
+      const { Box, Text, Svg, Button } = $.ui.resolve(e)
       return (
         <Box flexDirection="column">
+          <Box flexDirection="row">
+            {(Object.keys(TEAMS) as Team[]).map(k => (
+              <Box key={k} marginRight={1}>
+                <Button key={'team-' + k} label={(k === team() ? '● ' : '') + TEAMS[k]} onPress={() => pickTeam($, k)} />
+              </Box>
+            ))}
+          </Box>
           {list.map((w, i) => (
             <Box key={w.id} flexDirection="row" alignItems="center" marginTop={1}>
               <Svg source={svgOf(w, i, list)} alt={`${ROLES[w.role].label}: ${w.action}`} width={120} height={48} />
@@ -502,11 +529,19 @@ export const register: Register = on => {
         </Box>
       )
     }
-    const { Box, Text, Raster } = $.ui.resolve(e)
+    const { Box, Text, Raster, Button } = $.ui.resolve(e)
     const textWidth = Math.max(12, e.props.bodyColumns - SPRITE_COLS - 2)
     const busy = list.filter(w => w.status === 'work' || w.status === 'think').length
     return (
       <Box flexDirection="column">
+        <Box flexDirection="row">
+          <Text dimColor>Команда: </Text>
+          {(Object.keys(TEAMS) as Team[]).map(k => (
+            <Box key={k} marginRight={1}>
+              <Button key={'team-' + k} label={(k === team() ? '● ' : '') + TEAMS[k]} dimColor={k !== team()} onPress={() => pickTeam($, k)} />
+            </Box>
+          ))}
+        </Box>
         <Text dimColor>{busy === 0 ? 'все отдыхают' : `за работой: ${busy}`}</Text>
         {list.map((w, i) => (
           <Box key={w.id} flexDirection="row" marginTop={1}>

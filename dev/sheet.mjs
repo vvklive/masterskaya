@@ -1,4 +1,4 @@
-// Лист кадров: все роли за работой, по 4 фазы, в PNG. node dev/sheet.mjs out.png
+// Лист кадров: все роли за работой, по 4 фазы, в PNG. node dev/sheet.mjs out.png [standard|potter|marvel]
 // Бандлит hooks/sprites.ts через esbuild и рисует пиксели кадра (без Chrome).
 import { execFileSync } from 'node:child_process'
 import { writeFileSync, mkdtempSync } from 'node:fs'
@@ -8,8 +8,11 @@ import { join } from 'node:path'
 
 const dir = mkdtempSync(join(tmpdir(), 'ms-'))
 const js = join(dir, 'sprites.mjs')
-execFileSync('npx', ['-y', 'esbuild', 'hooks/sprites.ts', '--bundle', '--format=esm', '--outfile=' + js], { stdio: 'ignore' })
+const entry = join(dir, 'entry.ts')
+writeFileSync(entry, `export * from '${process.cwd()}/hooks/sprites.ts'\nexport { setTeam } from '${process.cwd()}/hooks/roles.ts'\n`)
+execFileSync('npx', ['-y', 'esbuild', entry, '--bundle', '--format=esm', '--outfile=' + js], { stdio: 'ignore' })
 const MS = await import(js)
+MS.setTeam(process.argv[3] || 'standard')
 const ROLES = ['foreman', 'mechanic', 'researcher', 'editor', 'writer', 'scout', 'designer', 'artist', 'librarian', 'planner', 'apprentice', 'done']
 const PH = [0, 2, 4, 6], S = 8, CW = 22, CH = 10
 const W = PH.length * CW * S, H = ROLES.length * CH * S

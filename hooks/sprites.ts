@@ -43,6 +43,9 @@ const HATS: Record<Exclude<Hat, 'none'>, string[]> = {
   detective: ['..HHHHHH..', 'HHHHHHHHHH'],
   beret: ['...HHHH...', '..HHHHHHH.'],
   cap: ['..HHHHHH..', '..HHHHHHHH'],
+  wizard: ['......HH..', '...HHHH...', 'HHHHHHHHHH'], // остроконечная шляпа: поля ложатся на макушку
+  hair: ['..HHHHHH..', '.HHHHHHHH.', '.H......H.'], // пряди по бокам ложатся на макушку
+  horns: ['HH......HH', '.HHHHHHHH.'],
 }
 
 // Инструменты в руке: рукоять у руки (клетка 11,4), высота 3–5 клеток, а не в рост персонажа.
@@ -58,6 +61,14 @@ const PROPS: Record<Exclude<Prop, 'bubble' | 'zzz'>, string[]> = {
   book: ['', '', 'BBBB', 'BWWB', 'BKKB', 'BBBB'],
   laptop: ['', '', '.KKKK', '.KLLK', '.KLLK', 'GGGGGG'],
   check: ['', '', '....g', '...gg', 'g.gg.', '.gg..'],
+  wand: ['', '....Y', '...H.', '..H..', '.H...', 'H....'],
+  snitch: ['', '', 'W.YY.W', '..YY..'],
+  orb: ['', '', '.LL.', 'LWLL', 'LLLL', '.LL.', 'HHHH'],
+  sock: ['', '', '.WW.', '.WW.', '.WWW', '.WWW'],
+  shield: ['', '.RRR.', 'RWWWR', 'RWBWR', 'RWWWR', '.RRR.'],
+  hex: ['', '..R..', '.R.R.', 'R...R', '.R.R.', '..R..'],
+  spark: ['', '.YYY.', 'Y...Y', 'Y.R.Y', 'Y...Y', '.YYY.'],
+  web: ['', 'W...W', '.W.W.', '..W..', '.W.W.', 'W...W'],
 }
 
 type Px = (number | null)[][]
@@ -91,7 +102,8 @@ function drawBody(px: Px, r: Role, body: number, o: Body = {}): void {
   const upR = o.arms === 'up' || o.arms === 'right'
   const mid = (upL ? '.' : 'X') + 'XXXXXXXX' + (upR ? '.' : 'X')
   stamp(px, [BODY[0]!, o.eyes ?? BODY[1]!, mid, BODY[3]!], 1, 2 + sink, bodySwap)
-  if (r.glasses) for (const x of [2, 4, 7, 9]) dot(px, x, 3 + sink, PAL.W)
+  if (r.glasses === 'patch') stamp(px, ['KKK'], 2, 3 + sink)
+  else if (r.glasses) for (const x of [2, 4, 7, 9]) dot(px, x, 3 + sink, PAL.W)
   if (r.hat !== 'none' && o.hat !== false) stamp(px, HATS[r.hat], 1, sink, { H: r.hatColor })
   if (upL) stamp(px, ['X', 'X'], 1, 1 + sink, bodySwap)
   if (upR) stamp(px, ['X', 'X'], 10, 1 + sink, bodySwap)
@@ -141,6 +153,24 @@ const MOTION: Partial<Record<Prop, [number, number][]>> = {
     [0, 0],
     [1, 0],
   ],
+  wand: [
+    [0, -1],
+    [1, 0],
+    [2, 1],
+    [1, 0],
+  ], // взмах палочкой
+  snitch: [
+    [0, -1],
+    [3, 0],
+    [1, 1],
+    [4, -1],
+  ], // снитч мечется
+  hex: [
+    [0, 0],
+    [1, -1],
+    [2, 0],
+    [1, 1],
+  ],
 }
 
 /** Сцена свободного времени. `tt` — общий для всех номер кадра, чтобы пара двигалась синхронно. */
@@ -149,6 +179,7 @@ export type Scene = { pastime?: Pastime; leads?: boolean; tt?: number }
 /** Один кадр работника: кто он (роль), что делает (статус), номер кадра. */
 export function frame(role: RoleKey, status: Status, t: number, body: number = PAL.X, run = false, scene: Scene = {}): Px {
   const r = ROLES[role]
+  body = r.body ?? body
   const px = blank()
   if (run) {
     // на бегу без инструмента и облачков
@@ -181,6 +212,8 @@ export function frame(role: RoleKey, status: Status, t: number, body: number = P
   if (status === 'work') {
     if (prop === 'laptop') swap = { L: t % 2 ? PAL.W : PAL.L }
     if (prop === 'book') swap = { K: t % 2 ? PAL.D : PAL.K }
+    if (prop === 'wand') swap = { Y: t % 2 ? PAL.W : PAL.Y }
+    if (prop === 'snitch') swap = { W: t % 2 ? PAL.G : PAL.W }
     const m = MOTION[prop]
     ;[mx, my] = m ? (m[phase] ?? [0, 0]) : [t % 2, 0]
   }

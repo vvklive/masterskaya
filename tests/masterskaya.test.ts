@@ -165,3 +165,26 @@ test('пока модель пишет правку, работает редак
   expect((await ui.find({ type: 'Text', text: /пишет правку/ }))?.text).toContain('пишет правку')
   await ui.unmount()
 })
+
+test('/masterskaya поттер переодевает команду: менеджер — Дамблдор, Bash делает Артур Уизли; выбор запоминается', async ($, on) => {
+  const store = new Map<string, unknown>()
+  on('ui.invalidate', () => ({ value: undefined }) as never)
+  on('store.get', (_, e) => ({ value: store.get((e as { key: string }).key) }))
+  on('store.set', (_, e) => (store.set((e as { key: string }).key, (e as { value: unknown }).value), { value: undefined }))
+  let lead: string | undefined
+  let mech: string | undefined
+  on('tool.call', async () => {
+    const ui = await $.ui.mount(BAND as never)
+    lead = (await ui.find({ type: 'Text', text: /^Дамблдор$/ }))?.text
+    mech = (await ui.find({ type: 'Text', text: /^Артур Уизли$/ }))?.text
+    await ui.unmount()
+    return { result: 'ok' }
+  })
+  const out = await $.command.run({ command: 'masterskaya', args: 'поттер' } as never)
+  expect(out.text).toBe('Команда: Гарри Поттер.')
+  expect(store.get('team')).toBe('potter')
+  await $.tool.call({ tool: 'Bash', command: 'ls' })
+  expect(lead).toBe('Дамблдор')
+  expect(mech).toBe('Артур Уизли')
+  expect((await $.command.run({ command: 'masterskaya', args: 'хоббиты' } as never)).text).toContain('Такой команды нет')
+})

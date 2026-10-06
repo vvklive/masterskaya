@@ -1,8 +1,9 @@
 import type { RoleKey } from '../types'
 
-export type Hat = 'hardhat' | 'detective' | 'beret' | 'cap' | 'none'
+export type Hat = 'hardhat' | 'detective' | 'beret' | 'cap' | 'wizard' | 'hair' | 'horns' | 'none'
 export type Prop =
-  'wrench' | 'magnifier' | 'pencil' | 'binoculars' | 'brush' | 'palette' | 'megaphone' | 'book' | 'laptop' | 'bubble' | 'zzz' | 'check'
+  | 'wrench' | 'magnifier' | 'pencil' | 'binoculars' | 'brush' | 'palette' | 'megaphone' | 'book' | 'laptop' | 'bubble' | 'zzz' | 'check'
+  | 'wand' | 'snitch' | 'orb' | 'sock' | 'shield' | 'hex' | 'spark' | 'web'
 
 export type Role = {
   label: string
@@ -10,11 +11,12 @@ export type Role = {
   color: string // цвет подписи в интерфейсе
   hat: Hat
   hatColor: number // 0xRRGGBB
-  glasses: boolean
+  glasses: boolean | 'patch'
   prop: Prop
+  body?: number // свой цвет тела (костюм персонажа); без него — цвет Clawd
 }
 
-export const ROLES: Record<RoleKey, Role> = {
+const STANDARD: Record<RoleKey, Role> = {
   mechanic: { label: 'Механик', inst: 'механиком', color: '#F2C230', hat: 'hardhat', hatColor: 0xf2c230, glasses: false, prop: 'wrench' },
   researcher: {
     label: 'Исследователь',
@@ -45,6 +47,60 @@ export const ROLES: Record<RoleKey, Role> = {
   thinker: { label: 'Думает', inst: 'помощником', color: '#D97757', hat: 'none', hatColor: 0, glasses: false, prop: 'bubble' },
   idle: { label: 'Отдыхает', inst: 'менеджером', color: '#8A8A8A', hat: 'hardhat', hatColor: 0xefefef, glasses: false, prop: 'zzz' },
   done: { label: 'Сдал работу', inst: 'помощником', color: '#5FB37A', hat: 'none', hatColor: 0, glasses: false, prop: 'check' },
+}
+
+export type Team = 'standard' | 'potter' | 'marvel'
+export const TEAMS: Record<Team, string> = { standard: 'Стандартная', potter: 'Гарри Поттер', marvel: 'Мстители и Marvel' }
+
+type Cast = Partial<Record<RoleKey, Partial<Role>>>
+// Состояния (думает, отдыхает, сдал работу) общие для всех команд — переодеваются только профессии.
+const CASTS: Record<Team, Cast> = {
+  standard: {},
+  potter: {
+    foreman: { label: 'Дамблдор', inst: 'Дамблдором', color: '#A98BEF', hat: 'wizard', hatColor: 0x8e5bd9, glasses: true, prop: 'wand' },
+    mechanic: { label: 'Артур Уизли', inst: 'Артуром Уизли', color: '#E0823D', hat: 'hair', hatColor: 0xd2691e, glasses: true },
+    researcher: { label: 'Гермиона', inst: 'Гермионой', color: '#C08A57', hat: 'detective', hatColor: 0x8b5a2b, glasses: false, prop: 'book' },
+    editor: { label: 'Макгонагалл', inst: 'Макгонагалл', color: '#5FB37A', hat: 'wizard', hatColor: 0x2e6b3f, glasses: true, prop: 'wand' },
+    writer: { label: 'Рита Скитер', inst: 'Ритой Скитер', color: '#F2C230', hat: 'hair', hatColor: 0xf2c230, glasses: true },
+    scout: { label: 'Гарри Поттер', inst: 'Гарри Поттером', color: '#E5484D', hat: 'hair', hatColor: 0x4b3a2e, glasses: true, prop: 'snitch' },
+    designer: { label: 'Локхарт', inst: 'Локхартом', color: '#B79BEF', hat: 'beret', hatColor: 0xe8b84a },
+    artist: { label: 'Луна Лавгуд', inst: 'Луной Лавгуд', color: '#9FD3F5', hat: 'hair', hatColor: 0xe8d9a0, glasses: true },
+    librarian: { label: 'Мадам Пинс', inst: 'мадам Пинс', glasses: false },
+    planner: { label: 'Трелони', inst: 'Трелони', color: '#A98BEF', hat: 'beret', hatColor: 0x8e5bd9, glasses: true, prop: 'orb' },
+    apprentice: { label: 'Добби', inst: 'Добби', color: '#B8C0CC', body: 0xb5b08a, prop: 'sock' },
+  },
+  marvel: {
+    foreman: { label: 'Ник Фьюри', inst: 'Ником Фьюри', color: '#9FB4D8', hat: 'none', glasses: 'patch' },
+    mechanic: { label: 'Тони Старк', inst: 'Тони Старком', color: '#E5484D', body: 0xc0392b, hatColor: 0xf2c230 },
+    researcher: { label: 'Брюс Бэннер', inst: 'Брюсом Бэннером', color: '#5FB37A', body: 0x5fb37a, hat: 'none' },
+    editor: { label: 'Ванда', inst: 'Вандой', color: '#D6455E', body: 0xa3243b, hat: 'none', prop: 'hex' },
+    writer: { label: 'Стив Роджерс', inst: 'Стивом Роджерсом', body: 0x3b4a8c, hat: 'none', glasses: false, prop: 'shield' },
+    scout: { label: 'Чёрная Вдова', inst: 'Чёрной Вдовой', color: '#B8C0CC', body: 0x4b4f5c, hat: 'hair', hatColor: 0xc0392b },
+    designer: { label: 'Шури', inst: 'Шури', color: '#A98BEF', body: 0x6b4fa0, hat: 'none', prop: 'laptop' },
+    artist: { label: 'Локи', inst: 'Локи', color: '#5FB37A', body: 0x2e6b3f, hat: 'horns', hatColor: 0xf2c230, prop: 'orb' },
+    librarian: { label: 'Вонг', inst: 'Вонгом', color: '#E8916A', glasses: false },
+    planner: { label: 'Доктор Стрэндж', inst: 'Доктором Стрэнджем', color: '#E8916A', body: 0x2f4f8f, hat: 'none', prop: 'spark' },
+    apprentice: { label: 'Человек-паук', inst: 'Человеком-пауком', color: '#E5484D', body: 0xd0312d, glasses: true, prop: 'web' },
+  },
+}
+
+// ponytail: одна изменяемая таблица — setTeam переписывает её на месте, и все ROLES[x] сразу видят новую команду
+export const ROLES: Record<RoleKey, Role> = { ...STANDARD }
+let current: Team = 'standard'
+export const team = (): Team => current
+
+export function setTeam(t: Team): void {
+  current = t
+  for (const k of Object.keys(STANDARD) as RoleKey[]) ROLES[k] = { ...STANDARD[k], ...CASTS[t][k] }
+}
+
+/** Команда по тому, что набрали после /masterskaya: номер, имя или вселенная. */
+export function teamOf(arg: string): Team | undefined {
+  const a = arg.trim().toLowerCase()
+  if (/^(1|станд|обыч|standard|default|clawd)/.test(a)) return 'standard'
+  if (/^(2|гарри|поттер|хогвартс|hp|harry|potter)/.test(a)) return 'potter'
+  if (/^(3|мстител|марвел|marvel|avengers)/.test(a)) return 'marvel'
+  return undefined
 }
 
 /** Что исполнитель делает, пока модель пишет аргументы вызова (до запуска инструмента). */
