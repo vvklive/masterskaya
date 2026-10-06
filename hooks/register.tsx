@@ -3,7 +3,7 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Worker } from '../types'
 import { plan } from './life'
-import { ROLES, roleOf, roleOfAgent, summarize } from './roles'
+import { PREP, ROLES, roleOf, roleOfAgent, summarize } from './roles'
 import { SPRITE_COLS, SPRITE_ROWS, bodyColor, frameCells, frameSvg } from './sprites'
 
 const PANE = 'masterskaya'
@@ -82,7 +82,7 @@ function offsetOf(w: Worker, now: number): number {
 
 const busy = (list: Worker[]): boolean => list.some(w => w.isSub && !w.leftAt && (w.status === 'work' || w.status === 'think'))
 
-/** Пока команда работает, а сам Claude не занят инструментом, он менеджер. */
+/** Пока команда работает, а сам Claude не занят инструментом, он спокойно смотрит за ней: в центре внимания исполнители. */
 // Одна просьба о звёздочке после установки: менеджер машет и болтает, после «Поставил» — пляшет. Больше не просит.
 const REPO = 'https://github.com/vvklive/masterskaya'
 let starAsk = false
@@ -92,7 +92,7 @@ const shown = (w: Worker, list: Worker[]): Worker => {
   if (w.id === MAIN && Date.now() < thanksUntil)
     return { ...w, role: 'foreman', status: 'idle', pastime: 'dance', action: 'спасибо! команда пляшет' }
   if (w.id === MAIN && starAsk) return { ...w, role: 'foreman', status: 'idle', pastime: 'chat', leads: true, action: 'привет, это мы!' }
-  return w.id === MAIN && w.status !== 'work' && busy(list) ? { ...w, role: 'foreman', status: 'work', action: 'руководит командой' } : w
+  return w.id === MAIN && w.status !== 'work' && busy(list) ? { ...w, role: 'foreman', status: 'think', action: 'смотрит за командой' } : w
 }
 
 function endStar($: EngineInterface): void {
@@ -122,6 +122,29 @@ const svgOf = (w: Worker, i: number, list: Worker[]): string => {
 }
 // ponytail: приложение анимируем перерисовкой полосы на каждом тике, только если оно подключено
 let desktopSeen = false
+
+/** Позвать исполнителя под инструмент: встаёт рядом (или выбегает), менеджер поручает. Номер вызова — для finish. */
+async function summon($: EngineInterface, tool: string, action: string): Promise<{ id: string; n: number }> {
+  const role = roleOf(tool)
+  const id = CREW + role
+  const n = (calls.get(id) ?? 0) + 1
+  calls.set(id, n)
+  const was = mirror.find(x => x.id === id)
+  lastCall.set(id, Date.now())
+  await patch($, id, {
+    name: shortTool(tool),
+    role,
+    status: 'work',
+    action,
+    isSub: true,
+    leftAt: undefined,
+    // уже стоит рядом — не выбегает заново
+    startedAt: was && !was.leftAt ? was.startedAt : Date.now(),
+  })
+  if (!was || was.leftAt) makeRoom($)
+  await patch($, MAIN, { role: 'foreman', status: 'think', action: 'поручил: ' + ROLES[role].label })
+  return { id, n }
+}
 
 const since = (w: Worker): number => lastCall.get(w.id) ?? w.startedAt
 const isActive = (w: Worker): boolean => w.isSub && !w.leftAt && w.status !== 'idle'
@@ -191,6 +214,16 @@ const tailFit = (s: string, width: number, lines: number): string => {
   return flat.length > n ? '…' + flat.slice(-n) : flat
 }
 
+/** Модель начала писать вызов инструмента: пока пишутся аргументы (текст правки, файл, команда), работает исполнитель. */
+async function prepare($: EngineInterface, tool: string, agentId?: string): Promise<void> {
+  const role = roleOf(tool)
+  if (agentId) {
+    lastCall.set(agentId, Date.now())
+    await patch($, agentId, { role, status: 'work', action: PREP[role] ?? 'готовится' })
+  } else if (role === 'foreman') await patch($, MAIN, { role, status: 'work', action: 'пишет задание' })
+  else await summon($, tool, PREP[role] ?? 'готовится')
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({ name: 'masterskaya', description: 'Открыть мастерскую: маскоты Claude за работой' })
@@ -218,6 +251,7 @@ export const register: Register = on => {
   on('turn.step', async function* ($, e, next) {
     for await (const c of next(e)) {
       if (!e.agentId && (c.kind === 'thinking' || c.kind === 'text')) think(c.text)
+      if (c.kind === 'tool') void prepare($, c.name, e.agentId)
       yield c
     }
   })
@@ -273,24 +307,8 @@ export const register: Register = on => {
       await patch($, MAIN, { role, status: 'think', action: 'обдумывает результат' })
       return ran
     }
-    const id = CREW + role
-    const n = (calls.get(id) ?? 0) + 1
-    calls.set(id, n)
+    const { id, n } = await summon($, e.tool, action)
     active.set(id, (active.get(id) ?? 0) + 1)
-    const was = mirror.find(x => x.id === id)
-    lastCall.set(id, Date.now())
-    await patch($, id, {
-      name: shortTool(e.tool),
-      role,
-      status: 'work',
-      action,
-      isSub: true,
-      leftAt: undefined,
-      // уже стоит рядом — не выбегает заново
-      startedAt: was && !was.leftAt ? was.startedAt : Date.now(),
-    })
-    if (!was || was.leftAt) makeRoom($)
-    await patch($, MAIN, { role: 'foreman', status: 'think', action: 'поручил: ' + ROLES[role].label })
     try {
       return await next(e)
     } finally {
@@ -314,6 +332,7 @@ export const register: Register = on => {
       thought = ''
       thoughtDirty = true
       await patch($, MAIN, { role: 'foreman', status: 'idle', action: 'отдыхает', pastimeUntil: 0 })
+      for (const w of mirror) if (w.id.startsWith(CREW) && w.status === 'work' && !(active.get(w.id) ?? 0)) finish($, w.id, calls.get(w.id) ?? 0)
     }
     return res
   })

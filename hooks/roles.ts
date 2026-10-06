@@ -47,6 +47,19 @@ export const ROLES: Record<RoleKey, Role> = {
   done: { label: 'Сдал работу', inst: 'помощником', color: '#5FB37A', hat: 'none', hatColor: 0, glasses: false, prop: 'check' },
 }
 
+/** Что исполнитель делает, пока модель пишет аргументы вызова (до запуска инструмента). */
+export const PREP: Partial<Record<RoleKey, string>> = {
+  mechanic: 'набирает команду',
+  researcher: 'ищет, что прочитать',
+  editor: 'пишет правку',
+  writer: 'пишет файл',
+  scout: 'составляет запрос',
+  designer: 'готовит макет',
+  artist: 'готовит генерацию',
+  librarian: 'ищет инструмент',
+  planner: 'составляет план',
+}
+
 /** Какой специалист нужен под инструмент. */
 export function roleOf(tool: string): RoleKey {
   if (tool === 'Bash' || tool === 'BashOutput' || tool === 'KillShell' || tool === 'Monitor') return 'mechanic'

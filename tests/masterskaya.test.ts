@@ -60,19 +60,19 @@ test('полоса над вводом показывает, чем занят C
   expect(action).toContain('запускает: ls')
 })
 
-test('помощник встаёт в ряд рядом с Claude, а Claude руководит', async ($, on) => {
+test('помощник встаёт в ряд рядом с Claude, а Claude смотрит за командой', async ($, on) => {
   let scout: string | undefined
   let lead: string | undefined
   on('tool.call', async () => {
     const ui = await $.ui.mount({ ...BAND, props: { ...BAND.props, bodyColumns: 160 } } as never)
     scout = (await ui.find({ type: 'Text', text: /Разведчик/ }))?.text
-    lead = (await ui.find({ type: 'Text', text: /руководит командой/ }))?.text
+    lead = (await ui.find({ type: 'Text', text: /смотрит за командой/ }))?.text
     await ui.unmount()
     return { result: 'ok' }
   })
   await $.tool.call({ tool: 'WebSearch', query: 'погода', agentId: 'helper-1' } as never)
   expect(scout).toBe('Разведчик')
-  expect(lead).toContain('руководит командой')
+  expect(lead).toContain('смотрит за командой')
 })
 
 test('за работой в полосе все работающие: четверо без подписей, если не влезают с ними', async ($, on) => {
@@ -150,4 +150,18 @@ test('после установки менеджер один раз проси�
   expect(await askText()).toBeUndefined()
   await $.session.start(START)
   expect(await askText()).toBeUndefined()
+})
+
+test('пока модель пишет правку, работает редактор, а не менеджер', async ($, on) => {
+  on('turn.step', async function* () {
+    yield { kind: 'tool', index: 0, id: 'tu1', name: 'Edit' }
+    yield { kind: 'input', index: 0, json: '{"file_path":"/tmp/a.ts"' }
+    return { turnId: 't', index: 0, answer: '', toolUses: [], stopReason: 'tool_use', usage: null }
+  } as never)
+  const s = $.turn.step({ turnId: 't', index: 0, model: 'm', messageCount: 1 })
+  for await (const _ of s) void _
+  const ui = await $.ui.mount({ ...BAND, props: { ...BAND.props, bodyColumns: 160 } } as never)
+  expect((await ui.find({ type: 'Text', text: /^Редактор$/ }))?.text).toBe('Редактор')
+  expect((await ui.find({ type: 'Text', text: /пишет правку/ }))?.text).toContain('пишет правку')
+  await ui.unmount()
 })

@@ -33,6 +33,7 @@ const pal = (ch: string): number | undefined => (ch in PAL ? PAL[ch as PalKey] :
 
 const BODY = ['.XXXXXXXX.', '.XEXXXXEX.', 'XXXXXXXXXX', '.XXXXXXXX.']
 const LOOK_LEFT = '.EXXXXEXX.'
+const LOOK_RIGHT = '.XXEXXXXE.'
 const EYES_SHUT = '.XXXXXXXX.'
 const LEGS = ['.X.X..X.X.', '.X.X..X.X.']
 const LEGS_STEP = ['.X.X..X.X.', 'X..X..X..X'] // ноги враскорячку — топчется за работой
@@ -44,17 +45,19 @@ const HATS: Record<Exclude<Hat, 'none'>, string[]> = {
   cap: ['..HHHHHH..', '..HHHHHHHH'],
 }
 
+// Инструменты в руке: рукоять у руки (клетка 11,4), высота 3–5 клеток, а не в рост персонажа.
+// Строки — абсолютные ряды кадра 0–7, пустые сверху не рисуются.
 const PROPS: Record<Exclude<Prop, 'bubble' | 'zzz'>, string[]> = {
-  wrench: ['G.G.....', 'GGG.....', '.GG.....', '..GG....', '...GG...', '....GG..', '.....GG.', '......GG'],
-  magnifier: ['.GGG....', 'GLLLG...', 'GLWLG...', 'GLLLG...', '.GGG....', '....HH..', '.....HH.', '......HH'],
-  pencil: ['.......P', '......YP', '.....YY.', '....YY..', '...YY...', '..YY....', '.bb.....', 'K.......'],
-  binoculars: ['........', '.GG..GG.', 'GGGGGGGG', 'GDDGGDDG', 'GLLG.LLG', 'GLLG.LLG', '.GG...GG', '........'],
-  brush: ['......PP', '.....PPP', '....GG..', '...HH...', '..HH....', '.HH.....', 'HH......', '........'],
-  palette: ['.bbbbb..', 'bRbgbbb.', 'bbbbBbbb', 'bYbb..bb', 'bbbb..b.', '.bbbbbb.', '..bbb...', '........'],
-  megaphone: ['......R.', '....RRR.', 'WWRRRRR.', 'WWRRRRR.', '....RRR.', '......R.', '...H....', '...H....'],
-  book: ['BBBBBBB.', 'BWWWWWB.', 'BWKKKWB.', 'BWWWWWB.', 'BWKKKWB.', 'BWWWWWB.', 'BBBBBBB.', '........'],
-  laptop: ['........', '.KKKKKK.', '.KLLLLK.', '.KLLLLK.', '.KLLLLK.', '.KKKKKK.', 'GGGGGGGG', '........'],
-  check: ['........', '.......g', '......gg', '.....gg.', 'g...gg..', 'gg.gg...', '.ggg....', '..g.....'],
+  wrench: ['', '', '..G.G', '..GGG', '.GG..', 'GG...'],
+  magnifier: ['', '..GGG', '..GLG', '..GGG', '.H...', 'H....'],
+  pencil: ['', '....P', '...YY', '..YY.', '.YY..', 'K....'],
+  binoculars: ['', '', 'GG.GG', 'GGGGG', 'LL.LL'],
+  brush: ['', '...PP', '...PP', '..H..', '.H...', 'H....'],
+  palette: ['', '', '.bbbb', 'bRbgb', 'bbBbb', '.bYb.'],
+  megaphone: ['', '', '....R', '..RRR', 'WRRRR', '..RRR', '....R'],
+  book: ['', '', 'BBBB', 'BWWB', 'BKKB', 'BBBB'],
+  laptop: ['', '', '.KKKK', '.KLLK', '.KLLK', 'GGGGGG'],
+  check: ['', '', '....g', '...gg', 'g.gg.', '.gg..'],
 }
 
 type Px = (number | null)[][]
@@ -157,7 +160,8 @@ export function frame(role: RoleKey, status: Status, t: number, body: number = P
   const phase = Math.floor(t / 2) % 4
   const strike = status === 'work' && MOTION[r.prop] !== undefined && phase === 2
   const step = status === 'work' ? t % 2 === 1 || strike : status === 'done' ? t % 4 === 0 : false
-  const eyes = status === 'think' && t % 8 >= 4 ? LOOK_LEFT : undefined
+  // менеджер стоит левее всех и поглядывает на команду, помощники — на менеджера
+  const eyes = status === 'think' && t % 8 >= 4 ? (role === 'foreman' ? LOOK_RIGHT : LOOK_LEFT) : undefined
   drawBody(px, r, body, { step, eyes })
 
   if (r.prop === 'bubble') {
