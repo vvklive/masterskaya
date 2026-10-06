@@ -74,6 +74,8 @@ const PROPS: Record<Exclude<Prop, 'bubble' | 'zzz'>, string[]> = {
   hammer: ['', '', 'GGGG', 'GGGG', '.H..', 'H...'], // Мьёльнир
   gauntlet: ['', '', 'YYYY', 'YRvY', 'YgBY', '.YY.'], // перчатка с камнями
   sprout: ['', '', '.g.g', '..g.', '..H.', '..H.'],
+  phoenix: ['', '..RY', '.RRR', 'RRRR', 'YRR.', '.Y..'], // Фоукс на руке
+  repulsor: ['', '', '', 'L', 'WLLLL', 'L'], // луч из ладони
 }
 
 type Px = (number | null)[][]
@@ -224,15 +226,10 @@ const MOTION: Partial<Record<Prop, [number, number][]>> = {
 export type Scene = { pastime?: Pastime; leads?: boolean; tt?: number }
 
 /** Один кадр работника: кто он (роль), что делает (статус), номер кадра. */
-export function frame(role: RoleKey, status: Status, t: number, body: number = PAL.X, run = false, scene: Scene = {}): Px {
+export function frame(role: RoleKey, status: Status, t: number, body: number = PAL.X, scene: Scene = {}): Px {
   const r = ROLES[role]
   body = r.body ?? body
   const px = blank()
-  if (run) {
-    // на бегу без инструмента и облачков
-    drawBody(px, r, body, { step: t % 2 === 1 })
-    return px
-  }
   if (status === 'idle') return rest(px, r, t, body, scene)
 
   const phase = Math.floor(t / 2) % 4
@@ -264,6 +261,8 @@ export function frame(role: RoleKey, status: Status, t: number, body: number = P
     if (prop === 'gauntlet') swap = { Y: t % 4 === 0 ? PAL.W : PAL.Y } // щелчок
     if (prop === 'spark') swap = t % 2 ? { Y: PAL.R, R: PAL.Y } : undefined // мандала крутится
     if (prop === 'cube') swap = { W: t % 2 ? PAL.L : PAL.W }
+    if (prop === 'repulsor') swap = { L: t % 2 ? PAL.W : PAL.L } // луч пульсирует
+    if (prop === 'phoenix') swap = t % 4 < 2 ? { Y: PAL.R, R: PAL.Y } : undefined // перья вспыхивают
     const m = MOTION[prop]
     ;[mx, my] = m ? (m[phase] ?? [0, 0]) : [t % 2, 0]
   }
@@ -304,8 +303,9 @@ type Art = {
   JUGGLE: PalKey[]
   BLOOM: PalKey // чем цветёт цветок
   FLY: 'balloon' | 'broom' | 'jets'
+  ARRIVE: 'run' | 'apparate' | 'fly' // как приходят в полосу и уходят из неё
 }
-const BASE: Art = { DRUM, MUG, NEWS, NEWS_NEXT, PHONE, CONSOLE, BALL, JUGGLE: ['R', 'Y', 'g'], BLOOM: 'P', FLY: 'balloon' }
+const BASE: Art = { DRUM, MUG, NEWS, NEWS_NEXT, PHONE, CONSOLE, BALL, JUGGLE: ['R', 'Y', 'g'], BLOOM: 'P', FLY: 'balloon', ARRIVE: 'run' }
 const ART: Record<Team, Partial<Art>> = {
   standard: {},
   potter: {
@@ -319,6 +319,7 @@ const ART: Record<Team, Partial<Art>> = {
     JUGGLE: ['P', 'g', 'Y'], // драже Берти Боттс
     BLOOM: 'g', // мандрагора: пучок листьев
     FLY: 'broom',
+    ARRIVE: 'apparate',
   },
   marvel: {
     DRUM: ['.bbb', 'bgRb', 'bbbb', '.WW.'], // шаурма
@@ -328,6 +329,7 @@ const ART: Record<Team, Partial<Art>> = {
     JUGGLE: ['R', 'v', 'Y'], // Камни бесконечности
     BLOOM: 'g', // малыш Грут
     FLY: 'jets',
+    ARRIVE: 'fly',
   },
 }
 const art = (): Art => ({ ...BASE, ...ART[team()] })
@@ -620,9 +622,90 @@ function shift(px: Px, dx: number): Px {
   return px.map(line => line.map((_, x) => (x - dx >= 0 ? (line[x - dx] ?? null) : null)))
 }
 
+/** Приход (out: false) или уход (out: true): q — доля пройденного, span — сколько пикселей бежать (8 — пара шагов на освободившееся место). */
+export type Move = { out: boolean; q: number; span?: number; walk?: boolean }
+
+const easeOut = (q: number): number => 1 - (1 - q) * (1 - q)
+const easeIn = (q: number): number => q * q
+
+/** Картинку вверх на dy пикселей: взлёт. */
+function lift(px: Px, dy: number): Px {
+  if (dy <= 0) return px
+  return px.map((_, y) => px[y + dy] ?? Array<number | null>(W).fill(null))
+}
+
+// хлопок трансгрессии: вспышка, клубы дыма, остатки дыма
+const FLASH = ['', '', '.....W', '....WYW', '.....W']
+const CLOUD = ['', '...GG.GG', '..GWWGWWG', '.GWW...WWG', '.GW.....WG', '..GWWGWWG', '...GG.GG']
+const WISPS = ['', '.G........G', '', '...G....G', '', '.G.......G']
+
+/** Пыль из-под ног бегущего: позади, то есть справа, когда бежит влево, и слева, когда вправо. */
+function dust(px: Px, behind: 'left' | 'right', beat: number): void {
+  if (behind === 'right') stamp(px, beat ? ['G.', '.G'] : ['.G', 'G.'], 11, 6)
+  else stamp(px, beat ? ['G', '.'] : ['.', 'G'], 1, 6)
+}
+
+/** Кадр с приходом и уходом: стандартные выбегают из-за края, волшебники трансгрессируют, Мстители подлетают. */
+export function pose(role: RoleKey, status: Status, t: number, body?: number, m?: Move, scene: Scene = {}): Px {
+  const still = (): Px => frame(role, status, t, body, scene)
+  if (!m) return still()
+  const r = ROLES[role]
+  const b = r.body ?? body ?? PAL.X
+  const q = Math.min(1, Math.max(0, m.q))
+  const k = m.out ? q : 1 - q // 0 — стоит на месте, 1 — его нет
+  // ponytail: ноги от настенных часов — мелькают чаще, чем тикает полоса; в тестах кадр не детерминирован, проверять положение, не фазу
+  const beat = Math.floor(Date.now() / 90) % 2
+  const px = blank()
+  const style = m.walk ? 'run' : art().ARRIVE
+  if (style === 'apparate') {
+    if (k >= 0.85) return px
+    if (k >= 0.6) {
+      stamp(px, CLOUD, 0, 0)
+      stamp(px, FLASH, 0, 0)
+      return px
+    }
+    const f = still()
+    if (k >= 0.35) stamp(f, CLOUD, 0, 0)
+    else if (k >= 0.08 && m.out) return shift(f, beat) // крутанулся на месте перед хлопком
+    else if (k >= 0.08) stamp(f, WISPS, 0, 0) // дым рассеивается
+    return f
+  }
+  if (style === 'fly') {
+    if (k < 0.06) return still()
+    if (m.out && q < 0.15) {
+      drawBody(px, r, b, { sink: 1 }) // присел перед взлётом
+      return px
+    }
+    drawBody(px, r, b, { sink: -1 })
+    for (const x of [2, 4, 7, 9]) dot(px, x, 7, (x + beat) % 2 ? PAL.Y : PAL.R) // огонь из ботинок
+    if (m.out) return lift(px, Math.round(10 * easeIn((q - 0.15) / 0.85)))
+    const e = 1 - easeOut(q) // остаток пути: прилетает справа сверху и садится
+    return shift(lift(px, Math.round(3 * e)), Math.round(SPRITE_COLS * e))
+  }
+  const span = m.span ?? SPRITE_COLS
+  if (m.out) {
+    if (q < 0.12) {
+      drawBody(px, r, b, { sink: 1, eyes: LOOK_RIGHT }) // присел, развернулся
+      return px
+    }
+    drawBody(px, r, b, { step: beat === 1, sink: beat, eyes: LOOK_RIGHT })
+    dust(px, 'left', beat)
+    return shift(px, Math.round(span * easeIn((q - 0.12) / 0.88)))
+  }
+  const e = 1 - easeOut(q)
+  if (q >= 0.85) {
+    drawBody(px, r, b, { sink: q < 0.93 ? 1 : 0 }) // тормозит
+    stamp(px, ['.G', 'GGG'], 10, 6) // пыль из-под ног
+    return shift(px, Math.round(span * e))
+  }
+  drawBody(px, r, b, { step: beat === 1, sink: beat, eyes: LOOK_LEFT })
+  dust(px, 'right', beat)
+  return shift(px, Math.round(span * e))
+}
+
 /** Тот же кадр картинкой SVG — для приложения Claude и панели, где нет Raster терминала. Соседние пиксели одного цвета — одним прямоугольником. */
-export function frameSvg(role: RoleKey, status: Status, t: number, body?: number, dx = 0, scene?: Scene, scale = 6): string {
-  const px = shift(frame(role, status, t, body, dx > 0, scene), dx)
+export function frameSvg(role: RoleKey, status: Status, t: number, body?: number, m?: Move, scene?: Scene, scale = 6): string {
+  const px = pose(role, status, t, body, m, scene)
   const rects: string[] = []
   for (let y = 0; y < H; y++) {
     let x = 1
@@ -641,8 +724,8 @@ export function frameSvg(role: RoleKey, status: Status, t: number, body?: number
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${SPRITE_COLS} ${H}" width="${SPRITE_COLS * scale}" height="${H * scale}" shape-rendering="crispEdges">${rects.join('')}</svg>`
 }
 
-export function frameCells(role: RoleKey, status: Status, t: number, body?: number, dx = 0, scene?: Scene): string {
-  return encode(shift(frame(role, status, t, body, dx > 0, scene), dx))
+export function frameCells(role: RoleKey, status: Status, t: number, body?: number, m?: Move, scene?: Scene): string {
+  return encode(pose(role, status, t, body, m, scene))
 }
 
 /** Свой оттенок тела для каждого сабагента, чтобы их различать. */

@@ -63,6 +63,7 @@ test('полоса над вводом показывает, чем занят C
 test('помощник встаёт в ряд рядом с Claude, а Claude смотрит за командой', async ($, on) => {
   let scout: string | undefined
   let lead: string | undefined
+  on('agent.spawn', () => ({ agentId: 'helper-1', model: 'm' }) as never)
   on('tool.call', async () => {
     const ui = await $.ui.mount({ ...BAND, props: { ...BAND.props, bodyColumns: 160 } } as never)
     scout = (await ui.find({ type: 'Text', text: /Разведчик/ }))?.text
@@ -70,6 +71,7 @@ test('помощник встаёт в ряд рядом с Claude, а Claude с
     await ui.unmount()
     return { result: 'ok' }
   })
+  await $.agent.spawn({ prompt: 'узнай погоду', description: 'погода', subagentType: 'general-purpose' } as never)
   await $.tool.call({ tool: 'WebSearch', query: 'погода', agentId: 'helper-1' } as never)
   expect(scout).toBe('Разведчик')
   expect(lead).toContain('смотрит за командой')
@@ -79,9 +81,11 @@ test('за работой в полосе все работающие: четв�
   let more: string | undefined
   let label: string | undefined
   let rasters = 0
+  let spawned = 0
+  on('agent.spawn', () => ({ agentId: 'h' + spawned++, model: 'm' }) as never)
   on('tool.call', async (_, e) => {
     if ((e as { agentId?: string }).agentId === 'h3') {
-      const ui = await $.ui.mount({ ...BAND, props: { ...BAND.props, bodyColumns: 200 } } as never)
+      const ui = await $.ui.mount({ ...BAND, props: { ...BAND.props, bodyColumns: 140 } } as never)
       more = (await ui.find({ type: 'Text', text: /^\+\d+$/ }))?.text
       label = (await ui.find({ type: 'Text', text: /^Исследователь$/ }))?.text
       for (const k of ['main', 'h0', 'h1', 'h2', 'h3']) if (await ui.find({ type: 'Raster', key: 'b-' + k } as never)) rasters++
@@ -89,6 +93,7 @@ test('за работой в полосе все работающие: четв�
     }
     return { result: 'ok' }
   })
+  for (let i = 0; i < 4; i++) await $.agent.spawn({ prompt: 'прочитай', description: 'чтение', subagentType: 'Explore' } as never)
   for (let i = 0; i < 4; i++) await $.tool.call({ tool: 'Read', file_path: '/tmp/x', agentId: 'h' + i } as never)
   expect(rasters).toBe(5)
   expect(more).toBeUndefined()
@@ -190,4 +195,31 @@ test('/masterskaya поттер переодевает команду: мене�
   expect(mech).toBe('Гарри Поттер')
   expect(spell).toContain('колдует: ls') // слова тоже из вселенной
   expect((await $.command.run({ command: 'masterskaya', args: 'хоббиты' } as never)).text).toContain('Такой команды нет')
+})
+
+test('служебный проход движка (память, сжатие) с чужим agentId не рисуется помощником', async ($, on) => {
+  let ghost: unknown
+  let hulkless: unknown
+  on('tool.call', async () => {
+    const ui = await $.ui.mount({ ...BAND, props: { ...BAND.props, bodyColumns: 160 } } as never)
+    ghost = await ui.find({ type: 'Text', text: /^Помощник$/ })
+    hulkless = await ui.find({ type: 'Text', text: /^Исследователь$/ })
+    await ui.unmount()
+    return { result: 'ok' }
+  })
+  await $.tool.call({ tool: 'Read', file_path: '/tmp/memory.md', agentId: 'engine-fork' } as never)
+  expect(ghost).toBeUndefined()
+  expect(hulkless).toBeUndefined()
+})
+
+test('пока идёт задача, отработавший исполнитель остаётся в полосе', async ($, on) => {
+  on('tool.call', () => ({ result: 'ok' }))
+  on('prompt.submit', (_, e) => e as never)
+  await $.prompt.submit({ text: 'прочитай файл' } as never)
+  await $.tool.call({ tool: 'Read', file_path: '/tmp/a.md' })
+  await $.tool.call({ tool: 'Bash', command: 'ls' })
+  const ui = await $.ui.mount({ ...BAND, props: { ...BAND.props, bodyColumns: 200 } } as never)
+  expect((await ui.find({ type: 'Text', text: /^Исследователь$/ }))?.text).toBe('Исследователь')
+  expect((await ui.find({ type: 'Text', text: /^Механик$/ }))?.text).toBe('Механик')
+  await ui.unmount()
 })

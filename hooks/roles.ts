@@ -4,6 +4,7 @@ export type Hat = 'hardhat' | 'detective' | 'beret' | 'cap' | 'wizard' | 'hair' 
 export type Prop =
   | 'wrench' | 'magnifier' | 'pencil' | 'binoculars' | 'brush' | 'palette' | 'megaphone' | 'book' | 'laptop' | 'bubble' | 'zzz' | 'check'
   | 'wand' | 'snitch' | 'sock' | 'shield' | 'spark' | 'web' | 'quill' | 'cube' | 'snake' | 'umbrella' | 'hammer' | 'gauntlet' | 'sprout'
+  | 'phoenix' | 'repulsor'
 
 export type Role = {
   label: string
@@ -86,7 +87,7 @@ const CASTS: Record<Team, Cast> = {
   standard: {},
   potter: {
     foreman: who(
-      'Дамблдор', 'Дамблдором', '#A98BEF', 0x6b3fa0, 'wand',
+      'Дамблдор', 'Дамблдором', '#A98BEF', 0x6b3fa0, 'phoenix',
       { paint: FACE, over: ['', '', '', '..w.g..g.w..', '...wwwwww...', '....wwww....', '.....ww.....'], pal: { w: 0xf2f2f2, g: 0xf2c230 } },
       { hat: 'wizard', hatColor: 0x8e5bd9 },
     ),
@@ -146,7 +147,7 @@ const CASTS: Record<Team, Cast> = {
     }),
   },
   marvel: {
-    foreman: who('Железный человек', 'Железным человеком', '#E5484D', 0xb3261e, 'megaphone', {
+    foreman: who('Железный человек', 'Железным человеком', '#E5484D', 0xb3261e, 'repulsor', {
       paint: ['', '', '...gggggg...', '...gggggg...', '.....LL.....'], // золотая маска, реактор
       eyes: 0xd6f3ff,
       pal: { g: 0xe0a82e, L: 0x9fe6ff },

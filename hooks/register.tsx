@@ -6,6 +6,7 @@ import { plan } from './life'
 import { PREP, ROLES, TEAMS, roleOf, roleOfAgent, say, setTeam, summarize, team, teamOf } from './roles'
 import type { Team } from './roles'
 import { SPRITE_COLS, SPRITE_ROWS, bodyColor, frameCells, frameSvg } from './sprites'
+import type { Move } from './sprites'
 
 const PANE = 'masterskaya'
 const MAIN = 'main'
@@ -78,15 +79,64 @@ async function drop($: EngineInterface, id: string): Promise<void> {
   })
 }
 
-const ENTER_MS = 900
-const LEAVE_MS = 900
+const ENTER_MS = 1100
+const LEAVE_MS = 1000
+const CATCH_MS = 450 // пара шагов на освободившееся место
+// ponytail: кто когда выбежал в полосу и убегает из неё — в переменных модуля; после перезагрузки все просто выбегут заново
+const enterAt = new Map<string, number>()
+const exitAt = new Map<string, number>()
+const catchAt = new Map<string, number>()
+let shownPrev: string[] = [] // кто стоял в полосе в прошлый раз, по порядку
+let turnAt = 0 // когда началась текущая задача; 0 — задачи нет
 
-/** Насколько помощник сдвинут вправо: выбегает из-за края, убегает за край. */
-function offsetOf(w: Worker, now: number): number {
-  if (!w.isSub) return 0
-  const p = w.leftAt ? (now - w.leftAt) / LEAVE_MS : 1 - (now - w.startedAt) / ENTER_MS
-  return Math.round(SPRITE_COLS * Math.min(1, Math.max(0, p)))
+/** Движение в большой панели: пришёл в мастерскую, ушёл домой. */
+function paneMove(w: Worker, now: number): Move | undefined {
+  if (!w.isSub) return undefined
+  if (w.leftAt) return { out: true, q: (now - w.leftAt) / LEAVE_MS }
+  const q = (now - w.startedAt) / ENTER_MS
+  return q < 1 ? { out: false, q } : undefined
 }
+
+/** Движение в полосе: ещё и выход на сцену, уход с неё и шаги на место ушедшего соседа. */
+function bandMove(w: Worker, now: number): Move | undefined {
+  if (!w.isSub) return undefined
+  const out = exitAt.get(w.id) ?? w.leftAt
+  if (out !== undefined) return { out: true, q: (now - out) / LEAVE_MS }
+  const inn = Math.max(enterAt.get(w.id) ?? 0, w.startedAt)
+  if (now - inn < ENTER_MS) return { out: false, q: (now - inn) / ENTER_MS }
+  const c = catchAt.get(w.id)
+  if (c !== undefined && now - c < CATCH_MS) return { out: false, q: (now - c) / CATCH_MS, span: 8, walk: true }
+  return undefined
+}
+
+/** Кто в полосе сейчас: попавшие на сцену выбегают, выпавшие убегают (стоят в ряду, пока не скроются), соседи подходят шагами. */
+function stageFor($: EngineInterface, subs: Worker[], now: number): Worker[] {
+  const stage = onStage(subs, turnAt)
+  const on = new Set(stage.map(w => w.id))
+  for (const w of stage) {
+    if (!shownPrev.includes(w.id) || exitAt.has(w.id)) enterAt.set(w.id, now)
+    exitAt.delete(w.id)
+  }
+  for (const id of shownPrev) {
+    const w = subs.find(x => x.id === id)
+    if (!w || on.has(id) || exitAt.has(id) || w.leftAt) continue
+    exitAt.set(id, now)
+    $.clock.after(LEAVE_MS + 60, () => $.ui.invalidate('ui.render'))
+  }
+  const leaving = (w: Worker): boolean => {
+    const at = exitAt.get(w.id) ?? w.leftAt
+    return at !== undefined && now - at < LEAVE_MS
+  }
+  const show = subs.filter(w => on.has(w.id) || (shownPrev.includes(w.id) && leaving(w)))
+  show.forEach((w, i) => {
+    if (on.has(w.id) && shownPrev.indexOf(w.id) > i) catchAt.set(w.id, now)
+  })
+  shownPrev = show.map(w => w.id)
+  return show
+}
+
+/** Сабагент — только тот, кого завели через agent.spawn; служебные проходы движка (память, сжатие) тоже несут agentId, их не рисуем. */
+const known = (id: string): boolean => mirror.some(w => w.id === id)
 
 const busy = (list: Worker[]): boolean => list.some(w => w.isSub && !w.leftAt && (w.status === 'work' || w.status === 'think'))
 
@@ -116,17 +166,17 @@ function thanks($: EngineInterface): void {
   $.clock.after(5100, () => $.ui.invalidate('ui.render'))
 }
 
-const cellsOf = (w: Worker, i: number, list: Worker[] = mirror): string => {
+const cellsOf = (w: Worker, i: number, m: Move | undefined, list: Worker[] = mirror): string => {
   const v = shown(w, list)
   const scene = { pastime: v.pastime, leads: v.leads, tt: t }
-  return frameCells(v.role, v.status, t + i, w.isSub ? bodyColor(i) : undefined, offsetOf(w, Date.now()), scene)
+  return frameCells(v.role, v.status, t + i, w.isSub ? bodyColor(i) : undefined, m, scene)
 }
 
 /** Тот же кадр для приложения Claude: картинка SVG вместо клеток терминала. */
-const svgOf = (w: Worker, i: number, list: Worker[]): string => {
+const svgOf = (w: Worker, i: number, list: Worker[], m?: Move): string => {
   const v = shown(w, list)
   const scene = { pastime: v.pastime, leads: v.leads, tt: t }
-  return frameSvg(v.role, v.status, t + i, w.isSub ? bodyColor(i) : undefined, offsetOf(w, Date.now()), scene)
+  return frameSvg(v.role, v.status, t + i, w.isSub ? bodyColor(i) : undefined, m, scene)
 }
 // ponytail: приложение анимируем перерисовкой полосы на каждом тике, только если оно подключено
 let desktopSeen = false
@@ -157,9 +207,9 @@ async function summon($: EngineInterface, tool: string, action: string): Promise
 const since = (w: Worker): number => lastCall.get(w.id) ?? w.startedAt
 const isActive = (w: Worker): boolean => w.isSub && !w.leftAt && w.status !== 'idle'
 
-/** Кто стоит рядом с менеджером: идёт работа — все, кто работает; нет — до двух отдыхающих, кого звали последними. Порядок прежний. */
-export function onStage(subs: Worker[]): Worker[] {
-  const active = subs.filter(isActive)
+/** Кто стоит рядом с менеджером: идёт задача — все, кого звали в ней (и кто ещё работает); нет — до двух отдыхающих, кого звали последними. Порядок прежний. */
+export function onStage(subs: Worker[], turn = 0): Worker[] {
+  const active = subs.filter(w => isActive(w) || (turn > 0 && !w.leftAt && since(w) >= turn))
   if (active.length) return active
   const chosen = new Set(
     subs
@@ -180,7 +230,10 @@ function live($: EngineInterface): void {
 
 /** Отдыхающих больше, чем мест: домой уходят те, кого дольше всех не звали. */
 function makeRoom($: EngineInterface): void {
-  const idle = mirror.filter(w => w.isSub && !w.leftAt && w.status === 'idle').sort((a, b) => since(a) - since(b))
+  // кого звали в текущей задаче, домой не отправляем до её конца
+  const idle = mirror
+    .filter(w => w.isSub && !w.leftAt && w.status === 'idle' && !(turnAt > 0 && since(w) >= turnAt))
+    .sort((a, b) => since(a) - since(b))
   for (const w of idle.slice(0, Math.max(0, idle.length - RESTING))) {
     void patch($, w.id, { leftAt: Date.now(), action: 'уходит домой' })
     $.clock.after(LEAVE_MS + 300, () => void drop($, w.id))
@@ -197,9 +250,13 @@ function finish($: EngineInterface, id: string, n: number): void {
 
 function tick($: EngineInterface): void {
   t += 1
+  const now = Date.now()
   mirror.forEach((w, i) => {
+    const bm = bandMove(w, now)
+    const pm = paneMove(w, now)
+    if (bm || pm) return // бегущих рисует animate, чаще
     if (w.status === 'idle' && (w.pastime ?? 'sleep') === 'sleep' && t % 3 !== 0) return // спящий дышит медленнее
-    const cells = cellsOf(w, i)
+    const cells = cellsOf(w, i, undefined)
     void $.ui.blit({ requestId: PANE, key: 'w-' + w.id, cells })
     if (bandId) void $.ui.blit({ requestId: bandId, key: 'b-' + w.id, cells })
   })
@@ -208,6 +265,20 @@ function tick($: EngineInterface): void {
     thoughtDirty = false
     $.ui.invalidate('ui.render')
   }
+}
+
+/** Быстрый кадр для тех, кто в движении: бег по пикселю, без рывков. */
+function animate($: EngineInterface): void {
+  const now = Date.now()
+  let moving = false
+  mirror.forEach((w, i) => {
+    const bm = bandMove(w, now)
+    const pm = paneMove(w, now)
+    if (pm) void $.ui.blit({ requestId: PANE, key: 'w-' + w.id, cells: cellsOf(w, i, pm) })
+    if (bm && bandId) void $.ui.blit({ requestId: bandId, key: 'b-' + w.id, cells: cellsOf(w, i, bm) })
+    moving = moving || !!(bm || pm)
+  })
+  if (moving && desktopSeen) $.ui.invalidate('ui.render')
 }
 
 const think = (text: string): void => {
@@ -226,6 +297,7 @@ const tailFit = (s: string, width: number, lines: number): string => {
 async function prepare($: EngineInterface, tool: string, agentId?: string): Promise<void> {
   const role = roleOf(tool)
   if (agentId) {
+    if (!known(agentId)) return
     lastCall.set(agentId, Date.now())
     await patch($, agentId, { role, status: 'work', action: PREP[role] ?? 'готовится' })
   } else if (role === 'foreman') await patch($, MAIN, { role, status: 'work', action: 'пишет задание' })
@@ -251,6 +323,7 @@ export const register: Register = on => {
     await update($, WORKERS, () => mirror)
     makeRoom($)
     $.clock.every(150, () => tick($))
+    $.clock.every(50, () => animate($))
     // большая панель — только по /masterskaya; по умолчанию живёт компактная полоса над вводом
     void $.ui.close({ id: PANE })
     $.ui.status(undefined) // строка состояния больше не дублирует полосу
@@ -283,6 +356,7 @@ export const register: Register = on => {
 
   on('prompt.submit', async ($, e, next) => {
     endStar($) // начали работать — просьба не мешает
+    turnAt = Date.now()
     thought = ''
     thoughtDirty = true
     await patch($, MAIN, { role: 'foreman', status: 'think', action: 'читает задачу' })
@@ -313,6 +387,7 @@ export const register: Register = on => {
     // Сабагент сам меняет профессию под инструмент.
     if (e.agentId) {
       const id = e.agentId
+      if (!known(id)) return next(e)
       lastCall.set(id, Date.now())
       await patch($, id, { role, status: 'work', action })
       const ran = await next(e)
@@ -346,6 +421,7 @@ export const register: Register = on => {
     const res = await next(e)
     if (e.agentId) {
       const id = e.agentId
+      if (!known(id)) return res
       await patch($, id, { status: 'done', action: 'сдал работу' })
       finish($, id, calls.get(id) ?? 0)
     } else {
@@ -353,6 +429,8 @@ export const register: Register = on => {
       thoughtDirty = true
       await patch($, MAIN, { role: 'foreman', status: 'idle', action: 'отдыхает', pastimeUntil: 0 })
       for (const w of mirror) if (w.id.startsWith(CREW) && w.status === 'work' && !(active.get(w.id) ?? 0)) finish($, w.id, calls.get(w.id) ?? 0)
+      turnAt = 0 // задача сдана: лишние отдыхающие расходятся по домам
+      makeRoom($)
     }
     return res
   })
@@ -367,7 +445,8 @@ export const register: Register = on => {
       desktopSeen = true
       const { Box, Text, Svg, Link, Button } = $.ui.resolve(e)
       const lead = shown(main, list)
-      const team = onStage(subs)
+      const now = Date.now()
+      const team = stageFor($, subs, now)
       return (
         <Box flexDirection="row" alignItems="center">
           <Svg source={svgOf(main, 0, list)} alt={`${ROLES[lead.role].label}: ${say(lead.action)}`} width={120} height={48} />
@@ -399,7 +478,7 @@ export const register: Register = on => {
             const v = shown(w, list)
             return (
               <Box key={w.id} flexDirection="row" alignItems="center" marginLeft={2}>
-                <Svg source={svgOf(w, list.indexOf(w), list)} alt={`${ROLES[v.role].label}: ${say(w.action)}`} width={120} height={48} />
+                <Svg source={svgOf(w, list.indexOf(w), list, bandMove(w, now))} alt={`${ROLES[v.role].label}: ${say(w.action)}`} width={120} height={48} />
                 <Box flexDirection="column" marginLeft={1}>
                   <Text bold color={ROLES[v.role].color}>
                     {ROLES[v.role].label}
@@ -418,30 +497,29 @@ export const register: Register = on => {
     // Не влезают с подписями — стоят одними спрайтами; не влезают и так — «+N».
     const cols = e.props.bodyColumns
     const lead = shown(main, list)
-    const SUB_TEXT = 16 // влезает «Железный человек»
-    const mainText = Math.min(40, Math.max(24, Math.floor(cols * 0.25)))
+    // Главному — узкая колонка (имя, действие, мысли), остальное — команде. Сколько влезает, решает ширина:
+    // подписи ужимаются с 16 знаков до 10, потом стоят одни спрайты, потом «+N».
+    const mainText = Math.min(30, Math.max(18, Math.floor(cols * 0.2)))
     const avail = cols - SPRITE_COLS - 1 - mainText
-    const wide = SPRITE_COLS + 1 + SUB_TEXT + 2
-    const narrow = SPRITE_COLS + 2
-    const stage = onStage(subs)
-    const withText = stage.length * wide <= avail
-    const slot = withText ? wide : narrow
-    const fit = stage.length * slot <= avail ? stage.length : Math.max(0, Math.floor((avail - 5) / slot))
+    const now = Date.now()
+    const stage = stageFor($, subs, now)
+    let subText = 0
+    for (let tw = 16; tw >= 10 && !subText; tw--) if (stage.length * (SPRITE_COLS + 3 + tw) <= avail) subText = tw
+    const slot = subText ? SPRITE_COLS + 3 + subText : SPRITE_COLS + 1
+    const fit = stage.length * slot <= avail ? stage.length : Math.max(0, Math.floor((avail - 4) / slot))
     const team = stage.slice(0, fit)
     // «+N» — только работающие, кому не хватило места; отдыхающие за кадром не в счёт
-    const extra = subs.filter(isActive).length - team.filter(isActive).length
+    const extra = stage.length - team.length
     return (
       <Box flexDirection="column">
         <Text dimColor>{'─'.repeat(cols)}</Text>
         <Box flexDirection="row">
-          <Raster key={'b-' + MAIN} columns={SPRITE_COLS} rows={SPRITE_ROWS} cells={cellsOf(main, 0, list)} />
+          <Raster key={'b-' + MAIN} columns={SPRITE_COLS} rows={SPRITE_ROWS} cells={cellsOf(main, 0, undefined, list)} />
           <Box flexDirection="column" marginLeft={1} width={mainText} height={SPRITE_ROWS} justifyContent="center" overflow="hidden">
-            <Text wrap="truncate">
-              <Text bold color={ROLES[lead.role].color}>
-                {ROLES[lead.role].label}
-              </Text>
-              <Text>: {say(lead.action)}</Text>
+            <Text bold color={ROLES[lead.role].color} wrap="truncate">
+              {ROLES[lead.role].label}
             </Text>
+            {starAsk ? null : <Text wrap="truncate">{say(lead.action)}</Text>}
             {starAsk ? (
               <Box flexDirection="column">
                 <Text dimColor wrap="truncate">
@@ -458,21 +536,21 @@ export const register: Register = on => {
             ) : null}
             {!starAsk && thought ? (
               <Text dimColor italic wrap="wrap">
-                {/* запас на перенос по словам, чтобы мысли не вылезли за 3 строки */}
-                {tailFit(thought, mainText - 6, 3)}
+                {/* запас на перенос по словам, чтобы мысли не вылезли за 2 строки */}
+                {tailFit(thought, mainText - 5, 2)}
               </Text>
             ) : null}
           </Box>
           {team.map(w => {
             const v = shown(w, list)
             return (
-              <Box key={w.id} flexDirection="row" marginLeft={2}>
-                <Raster key={'b-' + w.id} columns={SPRITE_COLS} rows={SPRITE_ROWS} cells={cellsOf(w, list.indexOf(w), list)} />
-                {withText ? (
+              <Box key={w.id} flexDirection="row" marginLeft={subText ? 2 : 1}>
+                <Raster key={'b-' + w.id} columns={SPRITE_COLS} rows={SPRITE_ROWS} cells={cellsOf(w, list.indexOf(w), bandMove(w, now), list)} />
+                {subText ? (
                   <Box
                     flexDirection="column"
                     marginLeft={1}
-                    width={SUB_TEXT}
+                    width={subText}
                     height={SPRITE_ROWS}
                     justifyContent="center"
                     overflow="hidden"
@@ -482,7 +560,7 @@ export const register: Register = on => {
                     </Text>
                     <Text wrap="truncate">{w.name}</Text>
                     <Text dimColor wrap="wrap">
-                      {tailFit(say(w.action), SUB_TEXT - 3, 2)}
+                      {tailFit(say(w.action), subText - 3, 2)}
                     </Text>
                   </Box>
                 ) : null}
@@ -516,7 +594,7 @@ export const register: Register = on => {
           </Box>
           {list.map((w, i) => (
             <Box key={w.id} flexDirection="row" alignItems="center" marginTop={1}>
-              <Svg source={svgOf(w, i, list)} alt={`${ROLES[w.role].label}: ${say(w.action)}`} width={120} height={48} />
+              <Svg source={svgOf(w, i, list, paneMove(w, Date.now()))} alt={`${ROLES[w.role].label}: ${say(w.action)}`} width={120} height={48} />
               <Box flexDirection="column" marginLeft={1}>
                 <Text bold color={ROLES[w.role].color}>
                   {ROLES[w.role].label}
@@ -545,7 +623,7 @@ export const register: Register = on => {
         <Text dimColor>{busy === 0 ? 'все отдыхают' : `за работой: ${busy}`}</Text>
         {list.map((w, i) => (
           <Box key={w.id} flexDirection="row" marginTop={1}>
-            <Raster key={'w-' + w.id} columns={SPRITE_COLS} rows={SPRITE_ROWS} cells={cellsOf(w, i)} />
+            <Raster key={'w-' + w.id} columns={SPRITE_COLS} rows={SPRITE_ROWS} cells={cellsOf(w, i, paneMove(w, Date.now()))} />
             <Box flexDirection="column" marginLeft={1} width={textWidth}>
               <Text bold color={ROLES[w.role].color}>
                 {ROLES[w.role].label}
