@@ -1,4 +1,5 @@
-// Лист кадров: все роли за работой, по 4 фазы, в PNG. node dev/sheet.mjs out.png [standard|potter|marvel]
+// Лист кадров: все роли за работой, по 4 фазы, в PNG. node dev/sheet.mjs out.png [standard|potter|marvel] [rest]
+// rest — досуг: занятия по строкам, ведущий персонаж команды
 // Бандлит hooks/sprites.ts через esbuild и рисует пиксели кадра (без Chrome).
 import { execFileSync } from 'node:child_process'
 import { writeFileSync, mkdtempSync } from 'node:fs'
@@ -13,12 +14,16 @@ writeFileSync(entry, `export * from '${process.cwd()}/hooks/sprites.ts'\nexport 
 execFileSync('npx', ['-y', 'esbuild', entry, '--bundle', '--format=esm', '--outfile=' + js], { stdio: 'ignore' })
 const MS = await import(js)
 MS.setTeam(process.argv[3] || 'standard')
-const ROLES = ['foreman', 'mechanic', 'researcher', 'editor', 'writer', 'scout', 'designer', 'artist', 'librarian', 'planner', 'apprentice', 'done']
+const ROLES = ['foreman', 'mechanic', 'researcher', 'scout', 'writer', 'designer', 'apprentice', 'artist', 'librarian', 'editor', 'planner', 'done']
 const PH = [0, 2, 4, 6], S = 8, CW = 22, CH = 10
 const W = PH.length * CW * S, H = ROLES.length * CH * S
 const img = Buffer.alloc(W * H * 3, 0xff)
+const REST = ['eat', 'coffee', 'read', 'phone', 'game', 'balloon', 'plant', 'juggle', 'ball', 'gym', 'music', 'paint']
+const rest = process.argv[4] === 'rest'
 ROLES.forEach((r, ry) => PH.forEach((t, cx) => {
-  const px = MS.frame(r === 'done' ? 'mechanic' : r, r === 'done' ? 'done' : 'work', t, r === 'foreman' ? undefined : MS.bodyColor(3))
+  const px = rest
+    ? MS.frame('mechanic', 'idle', t * 2 + 4, undefined, false, { pastime: REST[ry], leads: true, tt: t * 2 })
+    : MS.frame(r === 'done' ? 'mechanic' : r, r === 'done' ? 'done' : 'work', t, r === 'foreman' ? undefined : MS.bodyColor(3))
   px.forEach((row, y) => row.forEach((c, x) => {
     if (c == null) return
     for (let i = 0; i < S; i++) for (let j = 0; j < S; j++) {

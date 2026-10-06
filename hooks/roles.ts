@@ -3,7 +3,7 @@ import type { RoleKey } from '../types'
 export type Hat = 'hardhat' | 'detective' | 'beret' | 'cap' | 'wizard' | 'hair' | 'horns' | 'none'
 export type Prop =
   | 'wrench' | 'magnifier' | 'pencil' | 'binoculars' | 'brush' | 'palette' | 'megaphone' | 'book' | 'laptop' | 'bubble' | 'zzz' | 'check'
-  | 'wand' | 'snitch' | 'orb' | 'sock' | 'shield' | 'hex' | 'spark' | 'web'
+  | 'wand' | 'snitch' | 'sock' | 'shield' | 'spark' | 'web' | 'quill' | 'cube' | 'snake' | 'umbrella' | 'hammer' | 'gauntlet' | 'sprout'
 
 export type Role = {
   label: string
@@ -11,10 +11,17 @@ export type Role = {
   color: string // цвет подписи в интерфейсе
   hat: Hat
   hatColor: number // 0xRRGGBB
-  glasses: boolean | 'patch'
+  glasses: boolean
   prop: Prop
-  body?: number // свой цвет тела (костюм персонажа); без него — цвет Clawd
+  body?: number // цвет костюма (туловище); без него — цвет Clawd
+  look?: Look
 }
+
+/**
+ * Костюм персонажа поверх тела Clawd. Строки — ряды кадра 0–7, столбцы с 0; буквы из `pal`, иначе общей палитры.
+ * paint перекрашивает только само тело (лицо, эмблема, полосы), over рисуется поверх всего (волосы, борода, уши, маска).
+ */
+export type Look = { pal: Record<string, number>; paint?: string[]; over?: string[]; legs?: number; eyes?: number }
 
 const STANDARD: Record<RoleKey, Role> = {
   mechanic: { label: 'Механик', inst: 'механиком', color: '#F2C230', hat: 'hardhat', hatColor: 0xf2c230, glasses: false, prop: 'wrench' },
@@ -53,34 +60,153 @@ export type Team = 'standard' | 'potter' | 'marvel'
 export const TEAMS: Record<Team, string> = { standard: 'Стандартная', potter: 'Гарри Поттер', marvel: 'Мстители и Marvel' }
 
 type Cast = Partial<Record<RoleKey, Partial<Role>>>
+
+const SKIN = 0xf0c8a0
+const FACE = ['', '', '..ssssssss..', '..ssssssss..'] // голова — ряды 2–3, туловище — 4–5, ноги — 6–7
+const ROBE = 0x4a4a5c // школьная мантия: темнее нельзя, пропадёт на тёмном терминале
+
+/** Персонаж целиком: без шляпы и очков Clawd, всё лицо и костюм — в look. */
+const who = (label: string, inst: string, color: string, body: number, prop: Prop, look: Look, more: Partial<Role> = {}): Partial<Role> => ({
+  label,
+  inst,
+  color,
+  body,
+  prop,
+  look: { ...look, pal: { s: SKIN, ...look.pal } },
+  hat: 'none',
+  hatColor: 0,
+  glasses: false,
+  ...more,
+})
+
 // Состояния (думает, отдыхает, сдал работу) общие для всех команд — переодеваются только профессии.
+// Самые известные — на самых частых ролях: менеджер виден всегда, дальше Bash, чтение, сеть, Write, Figma, прочее, картинки, Skill, Edit, план
+// (порядок по счёту вызовов в сессиях Виктора, 06.10: Bash 9,5 тыс., Read 2 тыс., остальное — сотни).
 const CASTS: Record<Team, Cast> = {
   standard: {},
   potter: {
-    foreman: { label: 'Дамблдор', inst: 'Дамблдором', color: '#A98BEF', hat: 'wizard', hatColor: 0x8e5bd9, glasses: true, prop: 'wand' },
-    mechanic: { label: 'Артур Уизли', inst: 'Артуром Уизли', color: '#E0823D', hat: 'hair', hatColor: 0xd2691e, glasses: true },
-    researcher: { label: 'Гермиона', inst: 'Гермионой', color: '#C08A57', hat: 'detective', hatColor: 0x8b5a2b, glasses: false, prop: 'book' },
-    editor: { label: 'Макгонагалл', inst: 'Макгонагалл', color: '#5FB37A', hat: 'wizard', hatColor: 0x2e6b3f, glasses: true, prop: 'wand' },
-    writer: { label: 'Рита Скитер', inst: 'Ритой Скитер', color: '#F2C230', hat: 'hair', hatColor: 0xf2c230, glasses: true },
-    scout: { label: 'Гарри Поттер', inst: 'Гарри Поттером', color: '#E5484D', hat: 'hair', hatColor: 0x4b3a2e, glasses: true, prop: 'snitch' },
-    designer: { label: 'Локхарт', inst: 'Локхартом', color: '#B79BEF', hat: 'beret', hatColor: 0xe8b84a },
-    artist: { label: 'Луна Лавгуд', inst: 'Луной Лавгуд', color: '#9FD3F5', hat: 'hair', hatColor: 0xe8d9a0, glasses: true },
-    librarian: { label: 'Мадам Пинс', inst: 'мадам Пинс', glasses: false },
-    planner: { label: 'Трелони', inst: 'Трелони', color: '#A98BEF', hat: 'beret', hatColor: 0x8e5bd9, glasses: true, prop: 'orb' },
-    apprentice: { label: 'Добби', inst: 'Добби', color: '#B8C0CC', body: 0xb5b08a, prop: 'sock' },
+    foreman: who(
+      'Дамблдор', 'Дамблдором', '#A98BEF', 0x6b3fa0, 'wand',
+      { paint: FACE, over: ['', '', '', '..w.g..g.w..', '...wwwwww...', '....wwww....', '.....ww.....'], pal: { w: 0xf2f2f2, g: 0xf2c230 } },
+      { hat: 'wizard', hatColor: 0x8e5bd9 },
+    ),
+    mechanic: who('Гарри Поттер', 'Гарри Поттером', '#E5484D', ROBE, 'snitch', {
+      paint: [...FACE, '..agagagag..', '...a........'], // шарф Гриффиндора
+      over: ['...h.h.h....', '..hhhhhhhh..', '.h..z....h..', '..k.k..k.k..'], // вихры, шрам на лбу, круглые очки
+      pal: { h: 0x3a2e28, z: 0xe5484d, k: 0x1b1b1b, a: 0xb0302a, g: 0xe0b040 },
+    }),
+    researcher: who('Гермиона', 'Гермионой', '#C08A57', ROBE, 'book', {
+      paint: [...FACE, '....wraw....'],
+      over: ['', '..hhhhhhhh..', '.hhhhhhhhhh.', '.hh......hh.', '.hh......hh.', '.hh......hh.', '.h........h.'],
+      pal: { h: 0x7b4a2a, w: 0xf2f2f2, r: 0xb0302a, a: 0xe0b040 },
+    }),
+    scout: who('Волдеморт', 'Волдемортом', '#5FB37A', 0x34343e, 'snake', {
+      paint: FACE,
+      eyes: 0xe5484d,
+      over: ['', '', '', '.....nn.....'], // лысый, без носа, красные глаза
+      pal: { s: 0xdfe3dc, n: 0x8a8f88 },
+    }),
+    writer: who('Снейп', 'Снейпом', '#9FB4D8', 0x34343e, 'quill', {
+      paint: FACE,
+      over: ['', '..hhhhhhhh..', '.hhhh..hhhh.', '.hh......hh.', '.hh......hh.', '.h........h.'],
+      pal: { s: 0xe6d3b0, h: 0x3a3a42 },
+    }),
+    designer: who('Драко Малфой', 'Драко Малфоем', '#5FB37A', ROBE, 'brush', {
+      paint: [...FACE, '....wgGw....'], // галстук Слизерина
+      over: ['', '..hhhhhhhh..', '..hhhhhhhh..'],
+      pal: { h: 0xf1ecd6, w: 0xf2f2f2, g: 0x2e7d4a },
+    }),
+    apprentice: who('Рон Уизли', 'Роном Уизли', '#E0823D', 0x8b2e3c, 'wand', {
+      paint: [...FACE, '.....yy.....', '.....y.y....'], // свитер Уизли с буквой
+      legs: 0x5a4636,
+      over: ['', '..hhhhhhhh..', '.hhhhhhhhhh.', '.h........h.'],
+      pal: { y: 0xf2c230, h: 0xd2691e },
+    }),
+    artist: who('Луна Лавгуд', 'Луной Лавгуд', '#9FD3F5', 0x2f4f8f, 'palette', {
+      paint: FACE,
+      over: ['', '..hhhhhhhh..', '.hhhhhhhhhh.', '.hppp..ccch.', '.h........h.', '.h........h.', '.h........h.'], // очки-спектрики
+      pal: { h: 0xeee3b0, p: 0xef74a2, c: 0x5fd3f5 },
+    }),
+    librarian: who('Хагрид', 'Хагридом', '#C08A57', 0x6b4a2e, 'umbrella', {
+      paint: FACE,
+      over: ['', '.hhhhhhhhhh.', '.hh......hh.', '.hh......hh.', '.hhhhhhhhhh.', '..hhhhhhhh..', '...hhhhhh...'], // косматая грива и борода
+      pal: { h: 0x3b2a20 },
+    }),
+    editor: who(
+      'Макгонагалл', 'Макгонагалл', '#5FB37A', 0x1f6b45, 'wand',
+      { paint: FACE, over: ['', '', '', '..k.k..k.k..'], pal: { k: 0x222222 } },
+      { hat: 'wizard', hatColor: 0x174a30 },
+    ),
+    planner: who('Добби', 'Добби', '#B8C0CC', 0xd8cfb8, 'sock', {
+      paint: FACE,
+      legs: 0x9ea67e,
+      eyes: 0x3fae5a,
+      over: ['', '.s........s.', '.s.w....w.s.', '.s........s.'], // уши и глаза-мячики
+      pal: { s: 0x9ea67e, w: 0xf2f2f2 },
+    }),
   },
   marvel: {
-    foreman: { label: 'Ник Фьюри', inst: 'Ником Фьюри', color: '#9FB4D8', hat: 'none', glasses: 'patch' },
-    mechanic: { label: 'Тони Старк', inst: 'Тони Старком', color: '#E5484D', body: 0xc0392b, hatColor: 0xf2c230 },
-    researcher: { label: 'Брюс Бэннер', inst: 'Брюсом Бэннером', color: '#5FB37A', body: 0x5fb37a, hat: 'none' },
-    editor: { label: 'Ванда', inst: 'Вандой', color: '#D6455E', body: 0xa3243b, hat: 'none', prop: 'hex' },
-    writer: { label: 'Стив Роджерс', inst: 'Стивом Роджерсом', body: 0x3b4a8c, hat: 'none', glasses: false, prop: 'shield' },
-    scout: { label: 'Чёрная Вдова', inst: 'Чёрной Вдовой', color: '#B8C0CC', body: 0x4b4f5c, hat: 'hair', hatColor: 0xc0392b },
-    designer: { label: 'Шури', inst: 'Шури', color: '#A98BEF', body: 0x6b4fa0, hat: 'none', prop: 'laptop' },
-    artist: { label: 'Локи', inst: 'Локи', color: '#5FB37A', body: 0x2e6b3f, hat: 'horns', hatColor: 0xf2c230, prop: 'orb' },
-    librarian: { label: 'Вонг', inst: 'Вонгом', color: '#E8916A', glasses: false },
-    planner: { label: 'Доктор Стрэндж', inst: 'Доктором Стрэнджем', color: '#E8916A', body: 0x2f4f8f, hat: 'none', prop: 'spark' },
-    apprentice: { label: 'Человек-паук', inst: 'Человеком-пауком', color: '#E5484D', body: 0xd0312d, glasses: true, prop: 'web' },
+    foreman: who('Железный человек', 'Железным человеком', '#E5484D', 0xb3261e, 'megaphone', {
+      paint: ['', '', '...gggggg...', '...gggggg...', '.....LL.....'], // золотая маска, реактор
+      eyes: 0xd6f3ff,
+      pal: { g: 0xe0a82e, L: 0x9fe6ff },
+    }),
+    mechanic: who('Человек-паук', 'Человеком-пауком', '#E5484D', 0xd0312d, 'web', {
+      paint: ['', '', '.....kk.....', '', '..b..kk..b..', '..bb....bb..'],
+      legs: 0x2a4d9c,
+      eyes: 0xf2f2f2,
+      over: ['', '', '', '..w......w..'], // большие белые глаза маски
+      pal: { k: 0x1b1b1b, b: 0x2a4d9c, w: 0xf2f2f2 },
+    }),
+    researcher: who('Халк', 'Халком', '#5FB37A', 0x5fa84a, 'magnifier', {
+      paint: ['', '', '', '', '', '..pppppppp..'],
+      legs: 0x6b3fa0,
+      over: ['', '..hhhhhhhh..', '..h......h..'],
+      pal: { p: 0x6b3fa0, h: 0x3a3a3a },
+    }),
+    scout: who('Тор', 'Тором', '#F2C230', 0x4a5568, 'hammer', {
+      paint: [...FACE, '...G....G...'], // серебряные диски доспеха
+      over: ['', '..hhhhhhhh..', '.hhhhhhhhhh.', '.h........h.', '.c........c.', '.c........c.', '.c........c.'], // светлые волосы, красный плащ
+      pal: { h: 0xf2d04a, c: 0xc0392b },
+    }),
+    writer: who('Капитан Америка', 'Капитаном Америкой', '#7B8EAE', 0x2f4f9f, 'shield', {
+      paint: ['', '', '.....ww.....', '...ssssss...', '.....ww.....', '..rwrwrwrw..'], // шлем с «A», звезда, полосы
+      over: ['', '', '.w........w.'],
+      pal: { w: 0xf2f2f2, r: 0xc0392b },
+    }),
+    designer: who('Танос', 'Таносом', '#A98BEF', 0xc9a227, 'gauntlet', {
+      paint: [...FACE, '', '..bbbbbbbb..'], // фиолетовое лицо, золотые доспехи
+      legs: 0x2f3f6f,
+      over: ['', '', '', '....n..n....'], // борозды на подбородке
+      pal: { s: 0x8e6bb5, n: 0x6b4f8c, b: 0x2f3f6f },
+    }),
+    apprentice: who('Чёрная Вдова', 'Чёрной Вдовой', '#E5484D', 0x3a3a44, 'binoculars', {
+      paint: [...FACE, '', '..yyyrryyy..'],
+      over: ['', '..hhhhhhhh..', '.hhhhhhhhhh.', '.hh......hh.', '.h........h.', '.h........h.'],
+      pal: { h: 0xc0392b, y: 0xb8c0cc, r: 0xe5484d },
+    }),
+    artist: who(
+      'Локи', 'Локи', '#5FB37A', 0x2e7d4a, 'cube',
+      { paint: [...FACE, '....gggg....'], over: ['', '', '.kg......gk.', '.k........k.', '.k........k.'], pal: { g: 0xd4a017, k: 0x2b2b2b } },
+      { hat: 'horns', hatColor: 0xd4a017 },
+    ),
+    librarian: who('Доктор Стрэндж', 'Доктором Стрэнджем', '#E8916A', 0x2f4f8f, 'spark', {
+      paint: [...FACE, '.....gg.....'], // Глаз Агамотто
+      legs: 0x2b2b38,
+      over: ['', '..kkkkkkkk..', '.cG......Gc.', '.c........c.', '.c........c.', '.c........c.', '.c........c.'], // седые виски, плащ
+      pal: { k: 0x2b2b2b, G: 0xb8c0cc, c: 0xb3261e, g: 0xd4a017 },
+    }),
+    editor: who('Грут', 'Грутом', '#C08A57', 0x7a5230, 'sprout', {
+      paint: [...FACE, '..k..k..k...'], // кора
+      over: ['...g...g....', '..gg.g.gg...'], // листья на макушке
+      pal: { s: 0x9a6b3e, k: 0x5a3a20, g: 0x5fb37a },
+    }),
+    planner: who('Ник Фьюри', 'Ником Фьюри', '#9FB4D8', 0x3a3a44, 'book', {
+      paint: FACE,
+      eyes: 0xe6e6e6,
+      over: ['', '', '....k.......', '..kkk.......'], // повязка на левом глазу
+      pal: { s: 0x5a3825, k: 0x111111 },
+    }),
   },
 }
 
@@ -92,6 +218,116 @@ export const team = (): Team => current
 export function setTeam(t: Team): void {
   current = t
   for (const k of Object.keys(STANDARD) as RoleKey[]) ROLES[k] = { ...STANDARD[k], ...CASTS[t][k] }
+}
+
+// Слова команды: стандартная фраза → своя. Сравнение по началу строки, хвост (файл, команда, имя) остаётся.
+// ponytail: подмена при показе, а не при записи — смена команды сразу переозвучивает всех, кто уже стоит в полосе
+const PHRASES: Record<Team, [string, string][]> = {
+  standard: [],
+  potter: [
+    ['запускает: ', 'колдует: '],
+    ['набирает команду', 'выбирает заклинание'],
+    ['читает: ', 'штудирует: '],
+    ['ищет, что прочитать', 'ищет нужный свиток'],
+    ['ищет «', 'Акцио «'],
+    ['ищет файлы: ', 'Акцио, файлы: '],
+    ['правит: ', 'трансфигурирует: '],
+    ['правит блокнот: ', 'трансфигурирует блокнот: '],
+    ['пишет правку', 'готовит трансфигурацию'],
+    ['пишет: ', 'пишет на полях: '],
+    ['пишет файл', 'обмакивает перо'],
+    ['гуглит: ', 'выслеживает: '],
+    ['открывает: ', 'проникает в: '],
+    ['составляет запрос', 'выходит на охоту'],
+    ['раздаёт задачу: ', 'шлёт сову: '],
+    ['пишет задание', 'пишет письмо'],
+    ['достаёт инструкцию: ', 'берёт книгу заклинаний: '],
+    ['ищет инструмент', 'ищет нужный ключ'],
+    ['обновляет план', 'сверяет расписание'],
+    ['составляет план', 'ждёт распоряжений'],
+    ['ждёт ответа от вас', 'ждёт приказа хозяина'],
+    ['готовит макет', 'наводит лоск'],
+    ['готовит генерацию', 'видит мозгошмыгов'],
+    ['готовится', 'достаёт палочку'],
+    ['читает задачу', 'читает письмо'],
+    ['обдумывает результат', 'смотрит в Омут памяти'],
+    ['смотрит за командой', 'присматривает за учениками'],
+    ['получил задание', 'получил сову'],
+    ['сдал работу', 'сдал эссе'],
+    ['уходит домой', 'трансгрессирует домой'],
+    ['ест курочку', 'ест шоколадную лягушку'],
+    ['пьёт кофе', 'пьёт сливочное пиво'],
+    ['читает газету', 'читает «Пророк»'],
+    ['листает ленту', 'читает письмо из дома'],
+    ['играет в приставку', 'играет в волшебные шахматы'],
+    ['летает на шарике', 'летает на метле'],
+    ['поливает цветок', 'пересаживает мандрагору'],
+    ['медитирует', 'практикует окклюменцию'],
+    ['качает гантели', 'тренируется к квиддичу'],
+    ['жонглирует', 'жонглирует драже'],
+    ['рисует картину', 'рисует живой портрет'],
+    ['танцует', 'танцует на Святочном балу'],
+    ['моется в душе', 'плещется в ванной старост'],
+    ['гуляет', 'гуляет у Запретного леса'],
+    ['слушает музыку', 'слушает «Ведуний»'],
+    ['болтает с ', 'шепчется с '],
+    ['играет в мяч с ', 'дуэлирует с '],
+  ],
+  marvel: [
+    ['запускает: ', 'выстреливает: '],
+    ['набирает команду', 'заряжает веб-шутеры'],
+    ['читает: ', 'ХАЛК ЧИТАЕТ: '],
+    ['ищет, что прочитать', 'ХАЛК ДУМАЕТ'],
+    ['ищет «', 'ХАЛК ИЩЕТ «'],
+    ['ищет файлы: ', 'ХАЛК ИЩЕТ ФАЙЛЫ: '],
+    ['правит: ', 'Я есть Грут: '],
+    ['правит блокнот: ', 'Я есть Грут: '],
+    ['пишет правку', 'Я есть Грут'],
+    ['пишет: ', 'пишет в блокнот: '],
+    ['пишет файл', 'достаёт блокнот'],
+    ['гуглит: ', 'зовёт Биврёст: '],
+    ['открывает: ', 'летит в: '],
+    ['составляет запрос', 'раскручивает молот'],
+    ['раздаёт задачу: ', 'Мстители, общий сбор: '],
+    ['пишет задание', 'собирает Мстителей'],
+    ['достаёт инструкцию: ', 'открывает портал: '],
+    ['ищет инструмент', 'листает Книгу Вишанти'],
+    ['обновляет план', 'обновляет Инициативу'],
+    ['составляет план', 'строит Инициативу'],
+    ['ждёт ответа от вас', 'ждёт доклада от вас'],
+    ['готовит макет', 'уравновешивает макет'],
+    ['готовит генерацию', 'наводит иллюзию'],
+    ['готовится', 'надевает костюм'],
+    ['читает задачу', 'читает брифинг'],
+    ['обдумывает результат', 'сверяется с ДЖАРВИСом'],
+    ['получил задание', 'получил вызов'],
+    ['сдал работу', 'миссия выполнена'],
+    ['уходит домой', 'улетает на базу'],
+    ['ест курочку', 'ест шаурму'],
+    ['пьёт кофе', 'пьёт кофе в штабе'],
+    ['читает газету', 'читает «Дейли Бьюгл»'],
+    ['листает ленту', 'читает новости о себе'],
+    ['играет в приставку', 'режется в Galaga'],
+    ['летает на шарике', 'летает на репульсорах'],
+    ['поливает цветок', 'поливает малыша Грута'],
+    ['медитирует', 'медитирует в Камар-Тадже'],
+    ['качает гантели', 'тренируется на базе'],
+    ['жонглирует', 'жонглирует Камнями'],
+    ['рисует картину', 'рисует эскиз брони'],
+    ['танцует', 'танцует как Грут'],
+    ['моется в душе', 'отмывается после битвы'],
+    ['гуляет', 'патрулирует район'],
+    ['слушает музыку', 'слушает «Потрясный микс»'],
+    ['играет на гитаре', 'играет AC/DC'],
+    ['болтает с ', 'обсуждает план с '],
+    ['играет в мяч с ', 'кидает щит с '],
+  ],
+}
+
+/** Фраза голосом текущей команды. */
+export function say(action: string): string {
+  for (const [from, to] of PHRASES[current]) if (action.startsWith(from)) return to + action.slice(from.length)
+  return action
 }
 
 /** Команда по тому, что набрали после /masterskaya: номер, имя или вселенная. */

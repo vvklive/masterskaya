@@ -3,7 +3,7 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Worker } from '../types'
 import { plan } from './life'
-import { PREP, ROLES, TEAMS, roleOf, roleOfAgent, setTeam, summarize, team, teamOf } from './roles'
+import { PREP, ROLES, TEAMS, roleOf, roleOfAgent, say, setTeam, summarize, team, teamOf } from './roles'
 import type { Team } from './roles'
 import { SPRITE_COLS, SPRITE_ROWS, bodyColor, frameCells, frameSvg } from './sprites'
 
@@ -370,13 +370,13 @@ export const register: Register = on => {
       const team = onStage(subs)
       return (
         <Box flexDirection="row" alignItems="center">
-          <Svg source={svgOf(main, 0, list)} alt={`${ROLES[lead.role].label}: ${lead.action}`} width={120} height={48} />
+          <Svg source={svgOf(main, 0, list)} alt={`${ROLES[lead.role].label}: ${say(lead.action)}`} width={120} height={48} />
           <Box flexDirection="column" marginLeft={1}>
             <Text>
               <Text bold color={ROLES[lead.role].color}>
                 {ROLES[lead.role].label}
               </Text>
-              <Text>: {lead.action}</Text>
+              <Text>: {say(lead.action)}</Text>
             </Text>
             {starAsk ? (
               <Box flexDirection="column">
@@ -399,12 +399,12 @@ export const register: Register = on => {
             const v = shown(w, list)
             return (
               <Box key={w.id} flexDirection="row" alignItems="center" marginLeft={2}>
-                <Svg source={svgOf(w, list.indexOf(w), list)} alt={`${ROLES[v.role].label}: ${w.action}`} width={120} height={48} />
+                <Svg source={svgOf(w, list.indexOf(w), list)} alt={`${ROLES[v.role].label}: ${say(w.action)}`} width={120} height={48} />
                 <Box flexDirection="column" marginLeft={1}>
                   <Text bold color={ROLES[v.role].color}>
                     {ROLES[v.role].label}
                   </Text>
-                  <Text dimColor>{tailFit(w.action, 24, 1)}</Text>
+                  <Text dimColor>{tailFit(say(w.action), 24, 1)}</Text>
                 </Box>
               </Box>
             )
@@ -418,7 +418,7 @@ export const register: Register = on => {
     // Не влезают с подписями — стоят одними спрайтами; не влезают и так — «+N».
     const cols = e.props.bodyColumns
     const lead = shown(main, list)
-    const SUB_TEXT = 14
+    const SUB_TEXT = 16 // влезает «Железный человек»
     const mainText = Math.min(40, Math.max(24, Math.floor(cols * 0.25)))
     const avail = cols - SPRITE_COLS - 1 - mainText
     const wide = SPRITE_COLS + 1 + SUB_TEXT + 2
@@ -440,7 +440,7 @@ export const register: Register = on => {
               <Text bold color={ROLES[lead.role].color}>
                 {ROLES[lead.role].label}
               </Text>
-              <Text>: {lead.action}</Text>
+              <Text>: {say(lead.action)}</Text>
             </Text>
             {starAsk ? (
               <Box flexDirection="column">
@@ -482,7 +482,7 @@ export const register: Register = on => {
                     </Text>
                     <Text wrap="truncate">{w.name}</Text>
                     <Text dimColor wrap="wrap">
-                      {tailFit(w.action, SUB_TEXT - 3, 2)}
+                      {tailFit(say(w.action), SUB_TEXT - 3, 2)}
                     </Text>
                   </Box>
                 ) : null}
@@ -516,13 +516,13 @@ export const register: Register = on => {
           </Box>
           {list.map((w, i) => (
             <Box key={w.id} flexDirection="row" alignItems="center" marginTop={1}>
-              <Svg source={svgOf(w, i, list)} alt={`${ROLES[w.role].label}: ${w.action}`} width={120} height={48} />
+              <Svg source={svgOf(w, i, list)} alt={`${ROLES[w.role].label}: ${say(w.action)}`} width={120} height={48} />
               <Box flexDirection="column" marginLeft={1}>
                 <Text bold color={ROLES[w.role].color}>
                   {ROLES[w.role].label}
                 </Text>
                 <Text>{w.name}</Text>
-                <Text dimColor>{w.action}</Text>
+                <Text dimColor>{say(w.action)}</Text>
               </Box>
             </Box>
           ))}
@@ -554,7 +554,7 @@ export const register: Register = on => {
                 {w.name}
               </Text>
               <Text dimColor wrap="wrap">
-                {w.action}
+                {say(w.action)}
               </Text>
             </Box>
           </Box>

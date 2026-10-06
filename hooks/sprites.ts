@@ -2,8 +2,8 @@
 // каждая клетка — полублок ▀ (верхний пиксель цветом символа, нижний — фоном).
 // Ряды: 0–1 шляпа, 2–5 тело, 6–7 ноги; инструмент справа на всю высоту.
 import type { Pastime, RoleKey, Status } from '../types'
-import { ROLES } from './roles'
-import type { Hat, Prop, Role } from './roles'
+import { ROLES, team } from './roles'
+import type { Hat, Prop, Role, Team } from './roles'
 
 export const SPRITE_COLS = 20 // столбец 0 холста всегда пуст — в Raster его не берём
 export const SPRITE_ROWS = 4
@@ -63,12 +63,17 @@ const PROPS: Record<Exclude<Prop, 'bubble' | 'zzz'>, string[]> = {
   check: ['', '', '....g', '...gg', 'g.gg.', '.gg..'],
   wand: ['', '....Y', '...H.', '..H..', '.H...', 'H....'],
   snitch: ['', '', 'W.YY.W', '..YY..'],
-  orb: ['', '', '.LL.', 'LWLL', 'LLLL', '.LL.', 'HHHH'],
   sock: ['', '', '.WW.', '.WW.', '.WWW', '.WWW'],
   shield: ['', '.RRR.', 'RWWWR', 'RWBWR', 'RWWWR', '.RRR.'],
-  hex: ['', '..R..', '.R.R.', 'R...R', '.R.R.', '..R..'],
   spark: ['', '.YYY.', 'Y...Y', 'Y.R.Y', 'Y...Y', '.YYY.'],
   web: ['', 'W...W', '.W.W.', '..W..', '.W.W.', 'W...W'],
+  quill: ['', '....g', '...gg', '..gg.', '.gK..', 'K....'],
+  cube: ['', '', '.LLL', '.LWL', '.LLL'], // тессеракт
+  snake: ['', '', '...gg', '..g.K', '..g..', '...g.', 'gggg.'], // Нагайна
+  umbrella: ['', '.PPP.', 'PPPPP', '..H..', '..H..', '.HH..'], // розовый зонтик Хагрида
+  hammer: ['', '', 'GGGG', 'GGGG', '.H..', 'H...'], // Мьёльнир
+  gauntlet: ['', '', 'YYYY', 'YRvY', 'YgBY', '.YY.'], // перчатка с камнями
+  sprout: ['', '', '.g.g', '..g.', '..H.', '..H.'],
 }
 
 type Px = (number | null)[][]
@@ -93,20 +98,32 @@ function stamp(px: Px, rows: string[], x0: number, y0: number, swap?: Record<str
 
 type Body = { eyes?: string; sink?: number; step?: boolean; hat?: boolean; legs?: string[]; arms?: 'up' | 'left' | 'right' }
 
+/** Перекрасить только пиксели тела (лицо, эмблема, полосы костюма): руки, поднятые вверх, и глаза не задевает. */
+function recolor(px: Px, rows: string[], dy: number, body: number, swap: Record<string, number>): void {
+  rows.forEach((row, y) => {
+    for (let x = 0; x < row.length; x++) {
+      const ch = row[x] ?? '.'
+      if (ch !== '.' && px[y + dy]?.[x] === body) dot(px, x, y + dy, swap[ch] ?? pal(ch))
+    }
+  })
+}
+
 /** Тело Clawd. sink > 0 оседает, sink < 0 взлетает (ноги отрываются от земли); arms — какие руки подняты. */
 function drawBody(px: Px, r: Role, body: number, o: Body = {}): void {
   const sink = o.sink ?? 0
+  const look = r.look
   const bodySwap = { X: body }
-  stamp(px, o.legs ?? (o.step ? LEGS_STEP : LEGS), 1, 6 + Math.min(0, sink), bodySwap)
+  stamp(px, o.legs ?? (o.step ? LEGS_STEP : LEGS), 1, 6 + Math.min(0, sink), { X: look?.legs ?? body })
   const upL = o.arms === 'up' || o.arms === 'left'
   const upR = o.arms === 'up' || o.arms === 'right'
   const mid = (upL ? '.' : 'X') + 'XXXXXXXX' + (upR ? '.' : 'X')
-  stamp(px, [BODY[0]!, o.eyes ?? BODY[1]!, mid, BODY[3]!], 1, 2 + sink, bodySwap)
-  if (r.glasses === 'patch') stamp(px, ['KKK'], 2, 3 + sink)
-  else if (r.glasses) for (const x of [2, 4, 7, 9]) dot(px, x, 3 + sink, PAL.W)
+  stamp(px, [BODY[0]!, o.eyes ?? BODY[1]!, mid, BODY[3]!], 1, 2 + sink, { X: body, E: look?.eyes ?? PAL.E })
+  if (look?.paint) recolor(px, look.paint, sink, body, look.pal)
+  if (r.glasses) for (const x of [2, 4, 7, 9]) dot(px, x, 3 + sink, PAL.W)
   if (r.hat !== 'none' && o.hat !== false) stamp(px, HATS[r.hat], 1, sink, { H: r.hatColor })
   if (upL) stamp(px, ['X', 'X'], 1, 1 + sink, bodySwap)
   if (upR) stamp(px, ['X', 'X'], 10, 1 + sink, bodySwap)
+  if (look?.over) stamp(px, look.over, 0, sink, look.pal)
 }
 
 // Рабочие движения по фазам [dx, dy] инструмента, цикл 4 фазы по ~300 мс.
@@ -165,11 +182,41 @@ const MOTION: Partial<Record<Prop, [number, number][]>> = {
     [1, 1],
     [4, -1],
   ], // снитч мечется
-  hex: [
+  hammer: [
+    [0, -1],
+    [1, 0],
+    [2, 1],
+    [0, 0],
+  ], // удар молотом
+  web: [
+    [0, 0],
+    [2, -1],
+    [4, -1],
+    [2, 0],
+  ], // паутина летит
+  shield: [
+    [0, 0],
+    [2, 0],
+    [4, 0],
+    [2, 0],
+  ], // бросок щита
+  snake: [
+    [0, 0],
+    [1, 0],
+    [0, 1],
+    [-1, 0],
+  ], // Нагайна ползает
+  umbrella: [
+    [0, -1],
     [0, 0],
     [1, -1],
-    [2, 0],
-    [1, 1],
+    [0, 0],
+  ],
+  sprout: [
+    [0, 0],
+    [0, -1],
+    [0, 0],
+    [0, 1],
   ],
 }
 
@@ -214,6 +261,9 @@ export function frame(role: RoleKey, status: Status, t: number, body: number = P
     if (prop === 'book') swap = { K: t % 2 ? PAL.D : PAL.K }
     if (prop === 'wand') swap = { Y: t % 2 ? PAL.W : PAL.Y }
     if (prop === 'snitch') swap = { W: t % 2 ? PAL.G : PAL.W }
+    if (prop === 'gauntlet') swap = { Y: t % 4 === 0 ? PAL.W : PAL.Y } // щелчок
+    if (prop === 'spark') swap = t % 2 ? { Y: PAL.R, R: PAL.Y } : undefined // мандала крутится
+    if (prop === 'cube') swap = { W: t % 2 ? PAL.L : PAL.W }
     const m = MOTION[prop]
     ;[mx, my] = m ? (m[phase] ?? [0, 0]) : [t % 2, 0]
   }
@@ -241,6 +291,46 @@ const CONSOLE = ['KKKKK', 'KgKRK']
 const GUITAR = ['......D', '.....D.', '....D..', 'HHHD...', 'HHHH...', '.HH....']
 const CAN = ['BBB..', 'BBBBB', 'BBB..']
 const POT = ['HHH', '.H.']
+
+/** Предметы досуга: у каждой команды свои (лягушка вместо курочки, метла вместо шарика, щит вместо мяча). */
+type Art = {
+  DRUM: string[]
+  MUG: string[]
+  NEWS: string[]
+  NEWS_NEXT: string[]
+  PHONE: string[]
+  CONSOLE: string[]
+  BALL: string[]
+  JUGGLE: PalKey[]
+  BLOOM: PalKey // чем цветёт цветок
+  FLY: 'balloon' | 'broom' | 'jets'
+}
+const BASE: Art = { DRUM, MUG, NEWS, NEWS_NEXT, PHONE, CONSOLE, BALL, JUGGLE: ['R', 'Y', 'g'], BLOOM: 'P', FLY: 'balloon' }
+const ART: Record<Team, Partial<Art>> = {
+  standard: {},
+  potter: {
+    DRUM: ['.H.H.', 'HHHH.', 'HHHH.', 'H..H.'], // шоколадная лягушка
+    MUG: ['WWW.', 'YYYY', 'YYY.'], // сливочное пиво с пеной
+    NEWS: ['WWWWWWW', 'WDDWKKW', 'WDDWWWW', 'WWWWKKW', 'WKKWWWW', 'WWWWWWW'], // «Пророк»: фото на полосе шевелится
+    NEWS_NEXT: ['WWWWWWW', 'WGDWKKW', 'WDGWWWW', 'WWWWKKW', 'WKKWWWW', 'WWWWWWW'],
+    PHONE: ['bbbb', 'bRRb', 'bbbb'], // письмо с сургучом
+    CONSOLE: ['..W..', 'KWKWK', 'WKWKW'], // волшебные шахматы
+    BALL: ['WY', 'YW'], // заклинание в дуэли
+    JUGGLE: ['P', 'g', 'Y'], // драже Берти Боттс
+    BLOOM: 'g', // мандрагора: пучок листьев
+    FLY: 'broom',
+  },
+  marvel: {
+    DRUM: ['.bbb', 'bgRb', 'bbbb', '.WW.'], // шаурма
+    NEWS: ['RRRRRRR', 'bKKbKKb', 'bbbbbbb', 'bKbKKbb', 'bbbbbbb', 'bKKbbKb'], // «Дейли Бьюгл»
+    NEWS_NEXT: ['RRRRRRR', 'bKbKKbb', 'bbbbbbb', 'bKKbbKb', 'bbbbbbb', 'bKKbKKb'],
+    BALL: ['.R.', 'RBR', '.R.'], // щит Капитана
+    JUGGLE: ['R', 'v', 'Y'], // Камни бесконечности
+    BLOOM: 'g', // малыш Грут
+    FLY: 'jets',
+  },
+}
+const art = (): Art => ({ ...BASE, ...ART[team()] })
 const EASEL = ['HHHHHHH', 'HWWWWWH', 'HWWWWWH', 'HWWWWWH', 'HHHHHHH', '.H...H.', 'H.....H']
 // мазки на холсте появляются по одному, потом картина начинается заново
 const STROKES: [number, number, PalKey][] = [
@@ -305,6 +395,7 @@ const BALL_FOLLOW: ([number, number] | null)[] = [
 /** Свободное время: спит, ест, пьёт кофе, гуляет, моется, читает, играет с соседом. */
 function rest(px: Px, r: Role, t: number, body: number, scene: Scene): Px {
   const tt = scene.tt ?? t
+  const { DRUM, MUG, NEWS, NEWS_NEXT, PHONE, CONSOLE, BALL, JUGGLE: STONES, BLOOM, FLY } = art()
   switch (scene.pastime ?? 'sleep') {
     case 'sleep': {
       // дышит: каждые ~450 мс тело оседает на пиксель и поднимается обратно
@@ -386,6 +477,18 @@ function rest(px: Px, r: Role, t: number, body: number, scene: Scene): Px {
     case 'balloon': {
       // висит над землёй, болтает ногами, шарик покачивается
       const by = Math.floor(t / 4) % 2
+      if (FLY === 'broom') {
+        // сидит на метле, метла покачивается
+        drawBody(px, r, body, { sink: by ? -1 : 0 })
+        stamp(px, ['.Y', 'YYHHHHHHHHHHH', '.Y'], 0, by ? 5 : 6) // прутья сзади, древко между ног
+        return px
+      }
+      if (FLY === 'jets') {
+        // висит на репульсорах: огонь из ботинок
+        drawBody(px, r, body, { sink: -1 })
+        for (const x of [2, 4, 7, 9]) dot(px, x, 7, (t + x) % 2 ? PAL.Y : PAL.R)
+        return shift(px, by)
+      }
       drawBody(px, r, body, { sink: -1, step: t % 4 < 2 })
       stamp(px, BALLOON, 14, by)
       dot(px, 15, 3 + by, PAL.D)
@@ -430,13 +533,13 @@ function rest(px: Px, r: Role, t: number, body: number, scene: Scene): Px {
       const grow = Math.floor(t / 10) % 4 // цветок подрастает, потом всё заново
       for (let i = 0; i <= grow; i++) dot(px, 17, 5 - i, PAL.g)
       if (grow >= 2) dot(px, 18, 4, PAL.g)
-      if (grow >= 3) dot(px, 17, 1, PAL.P)
+      if (grow >= 3) dot(px, 17, 1, PAL[BLOOM])
       return px
     }
     case 'juggle': {
       drawBody(px, r, body, { eyes: t % 6 < 3 ? undefined : LOOK_LEFT })
       dot(px, 11, 4, body)
-      const colors = [PAL.R, PAL.Y, PAL.g]
+      const colors = STONES.map(k => PAL[k])
       colors.forEach((c, k) => {
         const at = JUGGLE[(t + k * 2) % JUGGLE.length]
         if (at) dot(px, at[0], at[1], c)
