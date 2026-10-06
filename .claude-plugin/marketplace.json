@@ -1,0 +1,14 @@
+{
+  "name": "masterskaya",
+  "owner": {
+    "name": "Viktor Kocelaev"
+  },
+  "description": "Мастерская — мод Claude Code: команда пиксельных Clawd над полем ввода",
+  "plugins": [
+    {
+      "name": "masterskaya",
+      "source": "./",
+      "description": "Мастерская: команда пиксельных Clawd живёт над полем ввода Claude Code — менеджер зовёт исполнителей под инструменты, после работы все отдыхают"
+    }
+  ]
+}

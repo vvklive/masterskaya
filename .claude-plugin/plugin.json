@@ -1,0 +1,19 @@
+{
+  "name": "masterskaya",
+  "version": "0.2.0",
+  "author": {
+    "name": "Viktor Kocelaev"
+  },
+  "description": "Мастерская: команда пиксельных Clawd живёт над полем ввода Claude Code — менеджер зовёт исполнителей под инструменты, после работы все отдыхают",
+  "types": "./types/index.d.ts",
+  "homepage": "https://github.com/vvklive/masterskaya",
+  "repository": "https://github.com/vvklive/masterskaya",
+  "license": "MIT",
+  "keywords": [
+    "mod",
+    "mascot",
+    "pixel-art",
+    "status",
+    "agents"
+  ]
+}
