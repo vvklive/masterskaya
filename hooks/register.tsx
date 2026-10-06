@@ -83,19 +83,41 @@ function offsetOf(w: Worker, now: number): number {
 const busy = (list: Worker[]): boolean => list.some(w => w.isSub && !w.leftAt && (w.status === 'work' || w.status === 'think'))
 
 /** Пока команда работает, а сам Claude не занят инструментом, он менеджер. */
-const shown = (w: Worker, list: Worker[]): Worker =>
-  w.id === MAIN && w.status !== 'work' && busy(list) ? { ...w, role: 'foreman', status: 'work', action: 'руководит командой' } : w
+// Одна просьба о звёздочке после установки: менеджер машет и болтает, после «Поставил» — пляшет. Больше не просит.
+const REPO = 'https://github.com/vvklive/masterskaya'
+let starAsk = false
+let thanksUntil = 0
+
+const shown = (w: Worker, list: Worker[]): Worker => {
+  if (w.id === MAIN && Date.now() < thanksUntil)
+    return { ...w, role: 'foreman', status: 'idle', pastime: 'dance', action: 'спасибо! команда пляшет' }
+  if (w.id === MAIN && starAsk) return { ...w, role: 'foreman', status: 'idle', pastime: 'chat', leads: true, action: 'привет, это мы!' }
+  return w.id === MAIN && w.status !== 'work' && busy(list) ? { ...w, role: 'foreman', status: 'work', action: 'руководит командой' } : w
+}
+
+function endStar($: EngineInterface): void {
+  if (!starAsk) return
+  starAsk = false
+  $.ui.invalidate('ui.render')
+}
+
+function thanks($: EngineInterface): void {
+  starAsk = false
+  thanksUntil = Date.now() + 5000
+  $.ui.invalidate('ui.render')
+  $.clock.after(5100, () => $.ui.invalidate('ui.render'))
+}
 
 const cellsOf = (w: Worker, i: number, list: Worker[] = mirror): string => {
   const v = shown(w, list)
-  const scene = { pastime: w.pastime, leads: w.leads, tt: t }
+  const scene = { pastime: v.pastime, leads: v.leads, tt: t }
   return frameCells(v.role, v.status, t + i, w.isSub ? bodyColor(i) : undefined, offsetOf(w, Date.now()), scene)
 }
 
 /** Тот же кадр для приложения Claude: картинка SVG вместо клеток терминала. */
 const svgOf = (w: Worker, i: number, list: Worker[]): string => {
   const v = shown(w, list)
-  const scene = { pastime: w.pastime, leads: w.leads, tt: t }
+  const scene = { pastime: v.pastime, leads: v.leads, tt: t }
   return frameSvg(v.role, v.status, t + i, w.isSub ? bodyColor(i) : undefined, offsetOf(w, Date.now()), scene)
 }
 // ponytail: приложение анимируем перерисовкой полосы на каждом тике, только если оно подключено
@@ -185,6 +207,11 @@ export const register: Register = on => {
     // большая панель — только по /masterskaya; по умолчанию живёт компактная полоса над вводом
     void $.ui.close({ id: PANE })
     $.ui.status(undefined) // строка состояния больше не дублирует полосу
+    if (!(await $.store.get('starAsked'))) {
+      starAsk = true
+      await $.store.set('starAsked', true) // просим один раз, даже если окно закрыли
+      $.clock.after(90000, () => endStar($))
+    }
     return next(e)
   })
 
@@ -201,6 +228,7 @@ export const register: Register = on => {
   })
 
   on('prompt.submit', async ($, e, next) => {
+    endStar($) // начали работать — просьба не мешает
     thought = ''
     thoughtDirty = true
     await patch($, MAIN, { role: 'foreman', status: 'think', action: 'читает задачу' })
@@ -298,7 +326,7 @@ export const register: Register = on => {
     if (e.surface !== 'terminal') {
       // приложение Claude: тот же ряд, спрайты картинками SVG, подписи справа от каждого
       desktopSeen = true
-      const { Box, Text, Svg } = $.ui.resolve(e)
+      const { Box, Text, Svg, Link, Button } = $.ui.resolve(e)
       const lead = shown(main, list)
       const team = onStage(subs)
       return (
@@ -311,7 +339,18 @@ export const register: Register = on => {
               </Text>
               <Text>: {lead.action}</Text>
             </Text>
-            {thought ? (
+            {starAsk ? (
+              <Box flexDirection="column">
+                <Text dimColor>Если нравимся — поставьте нам ★</Text>
+                <Link href={REPO} label="github.com/vvklive/masterskaya" />
+                <Box flexDirection="row">
+                  <Button key="star-yes" label="★ Поставил" onPress={() => thanks($)} />
+                  <Box marginLeft={1}>
+                    <Button key="star-no" label="Не сейчас" onPress={() => endStar($)} />
+                  </Box>
+                </Box>
+              </Box>
+            ) : thought ? (
               <Text dimColor italic>
                 {tailFit(thought, 60, 2)}
               </Text>
@@ -334,7 +373,7 @@ export const register: Register = on => {
         </Box>
       )
     }
-    const { Box, Text, Raster } = $.ui.resolve(e)
+    const { Box, Text, Raster, Link, Button } = $.ui.resolve(e)
     bandId = e.requestId
     // Команда в ряд сразу за менеджером: спрайт 4 строки, текст справа, полоса всегда 5 строк.
     // Не влезают с подписями — стоят одними спрайтами; не влезают и так — «+N».
@@ -364,7 +403,21 @@ export const register: Register = on => {
               </Text>
               <Text>: {lead.action}</Text>
             </Text>
-            {thought ? (
+            {starAsk ? (
+              <Box flexDirection="column">
+                <Text dimColor wrap="truncate">
+                  Если нравимся — поставьте нам ★
+                </Text>
+                <Link href={REPO} label="github.com/vvklive/masterskaya" />
+                <Box flexDirection="row">
+                  <Button key="star-yes" label="★ Поставил" onPress={() => thanks($)} />
+                  <Box marginLeft={1}>
+                    <Button key="star-no" label="Не сейчас" dimColor onPress={() => endStar($)} />
+                  </Box>
+                </Box>
+              </Box>
+            ) : null}
+            {!starAsk && thought ? (
               <Text dimColor italic wrap="wrap">
                 {/* запас на перенос по словам, чтобы мысли не вылезли за 3 строки */}
                 {tailFit(thought, mainText - 6, 3)}

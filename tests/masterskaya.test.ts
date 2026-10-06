@@ -124,3 +124,30 @@ test('в приложении Claude полоса рисует спрайты к
   expect(svg).toBeDefined()
   expect(mech).toBe('Механик')
 })
+
+test('после установки менеджер один раз просит звёздочку; «Не сейчас» убирает, второй раз не просит', async ($, on) => {
+  // за движок: старт сессии, команды, часы, панель и хранилище между сессиями
+  const store = new Map<string, unknown>()
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('command.register', (_, e) => ({ value: { command: (e as { name: string }).name } }))
+  // часы не идут: таймеры (досуг, конец просьбы через 90 с) в этом тесте не срабатывают
+  for (const k of ['clock.every', 'clock.after'] as const) on(k, () => new Promise(() => undefined) as never)
+  for (const k of ['ui.close', 'ui.status', 'ui.invalidate', 'ui.blit'] as const) on(k, () => ({ value: undefined }) as never)
+  on('store.get', (_, e) => ({ value: store.get((e as { key: string }).key) }))
+  on('store.set', (_, e) => (store.set((e as { key: string }).key, (e as { value: unknown }).value), { value: undefined }))
+  const START = { cwd: '/tmp', surface: 'terminal', isInteractive: true } as const
+  const askText = async () => {
+    const ui = await $.ui.mount(BAND as never)
+    const found = (await ui.find({ type: 'Text', text: /поставьте нам ★/ }))?.text
+    await ui.unmount()
+    return found
+  }
+  await $.session.start(START)
+  expect(await askText()).toContain('поставьте нам ★')
+  const ui = await $.ui.mount(BAND as never)
+  await $.ui.press({ plugin: 'masterskaya', key: 'star-no' })
+  await ui.unmount()
+  expect(await askText()).toBeUndefined()
+  await $.session.start(START)
+  expect(await askText()).toBeUndefined()
+})
