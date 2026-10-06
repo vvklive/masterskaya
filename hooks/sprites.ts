@@ -624,17 +624,21 @@ function rest(px: Px, r: Role, t: number, body: number, scene: Scene): Px {
         return px
       }
       if (FLY === 'cape') {
-        // летит кулаком вперёд, плащ полощется позади
+        // летит кулаком вперёд, красный плащ полощется позади во всю длину
         drawBody(px, r, body, { sink: -1, arms: 'right' })
-        for (let y = 1; y <= 3 + by; y++) dot(px, 1 - ((y + t) % 2), y, PAL.R)
-        return shift(px, by)
+        const f = shift(px, 3)
+        for (let y = 1; y <= 4; y++) {
+          const len = 2 + ((y + Math.floor(t / 2)) % 2) // край плаща волной
+          for (let x = 4 - len; x <= 3; x++) dot(f, x, y + by, PAL.R)
+        }
+        return f
       }
       if (FLY === 'dragon') {
-        // верхом на драконе, крылья машут
+        // верхом на драконе: тело и хвост под всадником, шея с головой впереди, крыло машет
         drawBody(px, r, body, { sink: -1 })
-        stamp(px, ['RRRRRRRRRRRRR'], 0, 7)
-        stamp(px, ['RR', '.RY'], 12, 5) // голова
-        stamp(px, by ? ['RR', 'R.'] : ['R.', 'RR'], 0, by ? 4 : 5) // крыло
+        const D = { R: 0xb0302a } // тело темнее крыла
+        stamp(px, ['................RRY', '...............RRRRR', 'RR..RRRRRRRRRRRRR', '..RRRRRRRRRRRR'], 0, 4, D) // голова, шея, тело, хвост
+        stamp(px, by ? ['....R', '..RRR', '.RRRR', 'RRRR.'] : ['RRRR.', '.RRRR', '..RRR'], 10, by ? 0 : 5) // крыло
         return px
       }
       if (FLY === 'jets') {
