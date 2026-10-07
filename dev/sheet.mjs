@@ -18,9 +18,9 @@ const ROLES = ['foreman', 'mechanic', 'researcher', 'scout', 'writer', 'designer
 const move = process.argv[4] === 'move'
 const guests = process.argv[4] === 'guests'
 const PH = move ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] : [0, 2, 4, 6], S = 8, CW = 22, CH = 10
-const MOVES = [['standard', false], ['standard', true], ['potter', false], ['potter', true], ['marvel', false], ['marvel', true], ['dc', false], ['dc', true], ['got', false], ['got', true], ['twilight', false], ['twilight', true], ['witcher', false], ['witcher', true], ['himym', false], ['himym', true]]
+const MOVES = [['standard', false], ['standard', true], ['potter', false], ['potter', true], ['marvel', false], ['marvel', true], ['dc', false], ['dc', true], ['got', false], ['got', true], ['twilight', false], ['twilight', true], ['witcher', false], ['witcher', true], ['himym', false], ['himym', true], ['dune', false], ['dune', true]]
 const W = PH.length * CW * S, H = (move ? MOVES.length : ROLES.length) * CH * S
-const img = Buffer.alloc(W * H * 3, 0xff)
+const img = Buffer.alloc(W * H * 3, process.env.BG === 'dark' ? 0x1e : 0xff) // BG=dark — как в терминале
 const REST = ['eat', 'coffee', 'read', 'phone', 'game', 'balloon', 'plant', 'juggle', 'ball', 'gym', 'music', 'paint']
 const rest = process.argv[4] === 'rest'
 ;(move ? MOVES : ROLES).forEach((r, ry) => PH.forEach((t, cx) => {

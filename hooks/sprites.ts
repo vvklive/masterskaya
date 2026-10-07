@@ -109,11 +109,21 @@ const PROPS: Record<Exclude<Prop, 'bubble' | 'zzz'>, string[]> = {
   mirror: ['', '.GGG.', 'GLWLG', 'GLLLG', '.GGG.', '..H..', '..H..'],
   rod: ['', '...HH', '..H.W', '.H..W', 'H...W', '....R'], // удочка Чарли с поплавком
   lute: ['', '....H', '...H.', 'YYH..', 'YYYY.', '.YY..'], // лютня Лютика, гитара Фиби
-  mic: ['', '', '..KK', '..KK', '...G', '..G..', '.G...'],
+  mic: ['', '', '..DD', '..DD', '...G', '..G..', '.G...'], // серая сетка: чёрная пропадала на тёмном терминале
   parasol: ['', '.YYY.', 'YYYYY', '..H..', '..H..', '.HH..'], // жёлтый зонт
   cup: ['', '', '', 'WWW.', 'WWWW', 'WWW.'], // кружка «Central Perk»
   sandwich: ['', '', '', '.bbbb', 'gRYgR', '.bbbb'],
   banana: ['', '', '...Y', '..YY', '.YY.', 'YY..'],
+  crysknife: ['', '..W..', '...W.', '...W.', '.KW..', 'K....'], // нож из зуба червя
+  thumper: ['', '..D..', '.DGD.', '..G..', '..G..', '..G..', '..G..'], // тампер
+  donut: ['', '', '.PYP.', 'PL.PP', '.PPY.'], // пончик с посыпкой
+  slingshot: ['', '', 'H.H', 'H.H', '.H.', '.H.'], // рогатка Барта
+  sax: ['', '...K', '..Y.', '..Y.', 'Y.YK', '.YY.'], // саксофон Лизы
+  beer: ['', '', 'WWW.', 'YYYY', 'YYY.', 'YYY.'], // «Дафф», «Потакет»
+  martini: ['', '', 'LLLLL', '.LgL.', '..L..', '..L..', '.LLL.'], // мартини Брайана
+  scythe: ['WWW..', '...WW', '....H', '...H.', '..H..', '.H...', 'H....'], // коса Смерти
+  mrhat: ['', '.vv.', 'vvvv', '.bb.', '.bKb', '.bbb'], // Мистер Шляпа
+  pacifier: ['', '', '', 'RR', 'RRR', 'RR'], // соска Мэгги
 }
 
 type Px = (number | null)[][]
@@ -429,8 +439,8 @@ type Art = {
   BALL: string[]
   JUGGLE: PalKey[]
   BLOOM: PalKey // чем цветёт цветок
-  FLY: 'balloon' | 'broom' | 'jets' | 'cape' | 'dragon' | 'pine'
-  ARRIVE: 'run' | 'apparate' | 'portal' | 'fly' | 'speed' | 'snow' | 'rain' | 'blur' // как приходят в полосу и уходят из неё
+  FLY: 'balloon' | 'broom' | 'jets' | 'cape' | 'dragon' | 'pine' | 'worm'
+  ARRIVE: 'run' | 'apparate' | 'portal' | 'fly' | 'speed' | 'snow' | 'rain' | 'sand' | 'blur' // как приходят в полосу и уходят из неё
   SHOWER: 'water' | 'sparkle' | 'tub' // душ, сверкание на солнце или бадья
 }
 const BASE: Art = { DRUM, MUG, NEWS, NEWS_NEXT, PHONE, CONSOLE, BALL, JUGGLE: ['R', 'Y', 'g'], BLOOM: 'P', FLY: 'balloon', ARRIVE: 'run', SHOWER: 'water' }
@@ -520,6 +530,30 @@ const ART: Record<Team, Partial<Art>> = {
     NEWS_NEXT: ['PPPPPPP', 'PWKWKWP', 'PWWWWWP', 'PWKKWWP', 'PWWWWWP', 'PPPPPPP'],
     BALL: ['WW', 'WW'], // записка комочком
     JUGGLE: ['W', 'W', 'W'], // отчёты
+  },
+  dune: {
+    DRUM: ['.bbb.', 'bHbHb', '.bbb.'], // лепёшка с пряностью
+    MUG: ['WWW.', 'HHHH', 'HHH.'], // кофе с пряностью
+    JUGGLE: ['H', 'Y', 'H'], // пряность
+    BLOOM: 'g',
+    FLY: 'worm',
+    ARRIVE: 'sand',
+  },
+  southpark: {
+    DRUM: ['RRRR', 'RYYR', 'RRRR'], // коробка сырных шариков
+    BALL: ['WW', 'WW'], // снежок
+    JUGGLE: ['W', 'W', 'W'],
+    ARRIVE: 'snow', // в Саут-Парке всегда снег
+  },
+  simpsons: {
+    DRUM: ['.PPP.', 'PP.PP', '.PPP.'], // пончик
+    MUG: ['RRR.', 'RWRR', 'RRR.'], // банка «Дафф»
+    BALL: ['KK', 'KK'], // шар для боулинга
+    JUGGLE: ['P', 'P', 'P'], // пончики
+  },
+  familyguy: {
+    MUG: ['WWW.', 'YYYY', 'YYY.'], // пиво «Потакет»
+    JUGGLE: ['Y', 'Y', 'Y'], // банки пива
   },
 }
 const art = (): Art => ({ ...BASE, ...ART[team()] })
@@ -706,6 +740,17 @@ function rest(px: Px, r: Role, t: number, body: number, scene: Scene): Px {
         const D = { R: 0xb0302a } // тело темнее крыла
         stamp(px, ['................RRY', '...............RRRRR', 'RR..RRRRRRRRRRRRR', '..RRRRRRRRRRRR'], 0, 4, D) // голова, шея, тело, хвост
         stamp(px, by ? ['....R', '..RRR', '.RRRR', 'RRRR.'] : ['RRRR.', '.RRRR', '..RRR'], 10, by ? 0 : 5) // крыло
+        return px
+      }
+      if (FLY === 'worm') {
+        // верхом на черве: кольца ходят волной, пасть впереди
+        drawBody(px, r, body, { sink: -1 })
+        for (let x = 0; x < 17; x++) {
+          const y = 6 + ((x + Math.floor(t / 2)) % 6 < 3 ? 0 : 1)
+          dot(px, x, y, x % 3 === 0 ? PAL.H : PAL.b)
+          dot(px, x, y + 1, PAL.H)
+        }
+        stamp(px, ['.bbb', 'bW.W', 'b.W.', 'bbbb'], 17, 4) // пасть с зубами
         return px
       }
       if (FLY === 'pine') {
@@ -939,10 +984,12 @@ export function pose(role: RoleKey, status: Status, t: number, body?: number, m?
     return moved
   }
   const ran = runPose(px, r, b, m, q, beat)
-  if (style === 'snow' || style === 'rain') {
-    // «Престолы» идут сквозь метель, «Как я встретил вашу маму» — под дождём
-    const tick = Math.floor(Date.now() / (style === 'rain' ? 80 : 160))
-    for (let i = 0; i < 6; i++) dot(ran, (i * 7 + (style === 'rain' ? 0 : tick)) % W, (i * 3 + tick) % H, style === 'rain' ? PAL.L : PAL.W)
+  if (style === 'snow' || style === 'rain' || style === 'sand') {
+    // «Престолы» и «Южный парк» идут сквозь метель, «Мама» — под дождём, «Дюна» — сквозь песчаную бурю вбок
+    const tick = Math.floor(Date.now() / (style === 'snow' ? 160 : 80))
+    const [dx, dy] = style === 'rain' ? [0, tick] : style === 'sand' ? [tick, 0] : [tick, tick]
+    const c = style === 'rain' ? PAL.L : style === 'sand' ? PAL.b : PAL.W
+    for (let i = 0; i < (style === 'sand' ? 9 : 6); i++) dot(ran, (i * 7 + dx) % W, (i * 3 + dy) % H, c)
   }
   return ran
 }
