@@ -1,0 +1,26 @@
+// Что нового. Первая строка — текущая версия (та же, что в plugin.json): мод сверяет этот файл с копией на GitHub
+// и, если там строки новее, зовёт обновиться. Новая версия = новая строка сверху.
+export const NEWS: [string, string][] = [
+  ['0.12.0', 'мастерская сама сообщает, когда вышло обновление'],
+  ['0.11.0', 'команда «Сумерки»: Белла, Джейкоб, Эдвард и Каллены'],
+  ['0.10.0', 'команды «Лига Справедливости» и «Игра престолов»'],
+  ['0.9.0', 'сабагенты — гости из вселенной команды'],
+  ['0.7.0', 'персонажи в костюмах, свои слова и досуг у каждой вселенной'],
+  ['0.5.0', 'команды «Гарри Поттер» и «Мстители»'],
+]
+
+export const NEWS_URL = 'https://raw.githubusercontent.com/vvklive/masterskaya/main/hooks/news.ts'
+
+const num = (v: string): number[] => v.split('.').map(Number)
+const later = (a: string, b: string): boolean => {
+  const [x, y] = [num(a), num(b)]
+  for (let i = 0; i < 3; i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) > (y[i] ?? 0)
+  return false
+}
+
+/** Строки удалённого news.ts новее нашей версии: [версия, что нового], самая свежая первой. */
+export function fresher(remote: string, mine = NEWS[0]![0]): [string, string][] {
+  // ponytail: разбор регэкспом, а не импортом — файл простой, строки вида ['x.y.z', 'текст']
+  const rows = [...remote.matchAll(/\['(\d+\.\d+\.\d+)', '([^']*)'\]/g)].map(m => [m[1]!, m[2]!] as [string, string])
+  return rows.filter(([v]) => later(v, mine))
+}

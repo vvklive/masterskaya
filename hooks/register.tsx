@@ -3,6 +3,7 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Worker } from '../types'
 import { plan } from './life'
+import { NEWS_URL, fresher } from './news'
 import { GUESTS, PREP, ROLES, TEAMS, face, roleOf, roleOfAgent, say, setTeam, summarize, team, teamOf } from './roles'
 import type { Team } from './roles'
 import { SPRITE_COLS, SPRITE_ROWS, bodyColor, frameCells, frameSvg } from './sprites'
@@ -163,6 +164,28 @@ const shown = (w: Worker, list: Worker[]): Worker => {
   if (w.id === MAIN && starAsk) return { ...w, role: 'foreman', status: 'idle', pastime: 'chat', leads: true, action: 'привет, это мы!' }
   return w.id === MAIN && w.status !== 'work' && busy(list) ? { ...w, role: 'foreman', status: 'think', action: 'смотрит за командой' } : w
 }
+
+// Обновление: при старте сессии сверяем news.ts с GitHub. Тост — один раз на версию, строка в панели — пока не обновились.
+const UPDATE_HOW = '/plugin update masterskaya, затем новая сессия'
+let newer: [string, string][] = []
+
+async function checkUpdate($: EngineInterface): Promise<void> {
+  try {
+    const r = await $.http.fetch(NEWS_URL)
+    if (!r.ok) return
+    newer = fresher(r.text)
+  } catch {
+    return // ponytail: нет сети или политика запрещает — молчим, проверим в следующей сессии
+  }
+  const top = newer[0]
+  if (!top || (await $.store.get('updateToasted')) === top[0]) return
+  await $.store.set('updateToasted', top[0])
+  $.ui.toast(`Вышла Мастерская ${top[0]}: ${top[1]}. Обновить: ${UPDATE_HOW}`, { timeoutMs: 15000 })
+  $.ui.invalidate('ui.render')
+}
+
+const updateLine = (): string | undefined =>
+  newer[0] && `Вышла ${newer[0][0]}: ${newer.map(x => x[1]).join('; ')}. Обновить: ${UPDATE_HOW}`
 
 function endStar($: EngineInterface): void {
   if (!starAsk) return
@@ -349,6 +372,7 @@ export const register: Register = on => {
       await $.store.set('starAsked', true) // просим один раз, даже если окно закрыли
       $.clock.after(90000, () => endStar($))
     }
+    void checkUpdate($)
     return next(e)
   })
 
@@ -609,6 +633,7 @@ export const register: Register = on => {
       const { Box, Text, Svg, Button } = $.ui.resolve(e)
       return (
         <Box flexDirection="column">
+          {updateLine() ? <Text color="#5FB37A">{updateLine()}</Text> : null}
           <Box flexDirection="row">
             {(Object.keys(TEAMS) as Team[]).map(k => (
               <Box key={k} marginRight={1}>
@@ -636,6 +661,11 @@ export const register: Register = on => {
     const busy = list.filter(w => w.status === 'work' || w.status === 'think').length
     return (
       <Box flexDirection="column">
+        {updateLine() ? (
+          <Text color="#5FB37A" wrap="wrap">
+            {updateLine()}
+          </Text>
+        ) : null}
         <Box flexDirection="row">
           <Text dimColor>Команда: </Text>
           {(Object.keys(TEAMS) as Team[]).map(k => (

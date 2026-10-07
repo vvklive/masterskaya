@@ -3,6 +3,7 @@ import { expect, test } from 'claude-code/testing'
 import type { Worker } from '../types'
 import { plan } from '../hooks/life'
 import { onStage } from '../hooks/register'
+import { NEWS, fresher } from '../hooks/news'
 
 const w = (id: string, fields: Partial<Worker> = {}): Worker => ({
   id,
@@ -48,4 +49,9 @@ test('идёт работа — в полосе все, кто работает,
     w('c', { status: 'work', startedAt: 2 }),
   ]
   expect(onStage(subs).map(x => x.id)).toEqual(['a', 'b', 'c'])
+})
+
+test('обновление: из news.ts на GitHub берутся только версии новее нашей', () => {
+  expect(NEWS[0]![0]).toMatch(/^\d+\.\d+\.\d+$/)
+  expect(fresher("['0.1.0', 'старое'],\n['99.0.0', 'новое']")).toEqual([['99.0.0', 'новое']])
 })

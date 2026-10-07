@@ -285,3 +285,28 @@ test('ещё три вселенные: Лига Справедливости, �
   await $.tool.call({ tool: 'Bash', command: 'ls' })
   expect(seen.twilight).toEqual(['Белла', 'Джейкоб', 'заводит: ls'])
 })
+
+test('вышла новая версия — один тост на версию и строка в панели, пока не обновились', async ($, on) => {
+  const store = new Map<string, unknown>()
+  const toasts: string[] = []
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('command.register', (_, e) => ({ value: { command: (e as { name: string }).name } }))
+  for (const k of ['clock.every', 'clock.after'] as const) on(k, () => new Promise(() => undefined) as never)
+  for (const k of ['ui.close', 'ui.status', 'ui.invalidate', 'ui.blit'] as const) on(k, () => ({ value: undefined }) as never)
+  on('store.get', (_, e) => ({ value: store.get((e as { key: string }).key) }))
+  on('store.set', (_, e) => (store.set((e as { key: string }).key, (e as { value: unknown }).value), { value: undefined }))
+  on('ui.toast', (_, e) => (toasts.push((e as { text: string }).text), { value: undefined }) as never)
+  const remote = "export const NEWS = [\n  ['99.1.0', 'драконы'],\n  ['99.0.0', 'единороги'],\n  ['0.1.0', 'старое'],\n]"
+  on('http.fetch', () => ({ value: { status: 200, ok: true, headers: {}, text: remote } }) as never)
+  const START = { cwd: '/tmp', surface: 'terminal', isInteractive: true } as const
+  const settle = () => new Promise(r => setTimeout(r, 30)) // проверка обновления идёт в фоне, старт сессии её не ждёт
+  await $.session.start(START)
+  await settle()
+  expect(toasts).toEqual(['Вышла Мастерская 99.1.0: драконы. Обновить: /plugin update masterskaya, затем новая сессия'])
+  const ui = await $.ui.mount(PANE as never)
+  expect((await ui.find({ type: 'Text', text: /^Вышла 99\.1\.0/ }))?.text).toContain('драконы; единороги')
+  await ui.unmount()
+  await $.session.start(START)
+  await settle()
+  expect(toasts.length).toBe(1) // второй сессии тост не нужен, строка в панели остаётся
+})
