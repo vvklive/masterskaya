@@ -259,7 +259,7 @@ test('сабагент сдал работу — постоял с галочк�
   expect(await named()).toBeUndefined()
 })
 
-test('ещё две вселенные: Лига Справедливости и Игра престолов — свои менеджеры, исполнители и слова', async ($, on) => {
+test('ещё три вселенные: Лига Справедливости, Игра престолов и Сумерки — свои менеджеры, исполнители и слова', async ($, on) => {
   const store = new Map<string, unknown>()
   const seen: Record<string, (string | undefined)[]> = {}
   let label = ''
@@ -268,7 +268,7 @@ test('ещё две вселенные: Лига Справедливости и
   on('tool.call', async () => {
     const ui = await $.ui.mount({ ...BAND, props: { ...BAND.props, bodyColumns: 160 } } as never)
     const find = async (re: RegExp) => (await ui.find({ type: 'Text', text: re }))?.text
-    seen[label] = [await find(/^(Бэтмен|Дейенерис)$/), await find(/^(Супермен|Джон Сноу)$/), await find(/(разгоняет|рубит): ls/)]
+    seen[label] = [await find(/^(Бэтмен|Дейенерис|Белла)$/), await find(/^(Супермен|Джон Сноу|Джейкоб)$/), await find(/(разгоняет|рубит|заводит): ls/)]
     await ui.unmount()
     return { result: 'ok' }
   })
@@ -280,4 +280,8 @@ test('ещё две вселенные: Лига Справедливости и
   await $.tool.call({ tool: 'Bash', command: 'ls' })
   expect(seen.dc).toEqual(['Бэтмен', 'Супермен', 'разгоняет: ls'])
   expect(seen.got).toEqual(['Дейенерис', 'Джон Сноу', 'рубит: ls'])
+  label = 'twilight'
+  expect((await $.command.run({ command: 'masterskaya', args: 'сумерки' } as never)).text).toBe('Команда: Сумерки.')
+  await $.tool.call({ tool: 'Bash', command: 'ls' })
+  expect(seen.twilight).toEqual(['Белла', 'Джейкоб', 'заводит: ls'])
 })

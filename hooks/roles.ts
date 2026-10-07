@@ -7,6 +7,7 @@ export type Prop =
   | 'phoenix' | 'repulsor' | 'katana' | 'walkman' | 'blaster' | 'bow' | 'firework'
   | 'batarang' | 'heat' | 'lasso' | 'bolt' | 'card' | 'bat' | 'staff' | 'lantern' | 'trident' | 'tray' | 'kryptonite' | 'cane'
   | 'dragon' | 'sword' | 'needle' | 'greatsword' | 'hoop' | 'door' | 'flame' | 'raven' | 'scroll' | 'goblet' | 'icespear' | 'ladder'
+  | 'apple' | 'mirror' | 'rod'
 
 export type Role = {
   label: string
@@ -68,13 +69,14 @@ const STANDARD: Record<RoleKey, Role> = {
   done: { label: 'Сдал работу', inst: 'помощником', color: '#5FB37A', hat: 'none', hatColor: 0, glasses: false, prop: 'check' },
 }
 
-export type Team = 'standard' | 'potter' | 'marvel' | 'dc' | 'got'
+export type Team = 'standard' | 'potter' | 'marvel' | 'dc' | 'got' | 'twilight'
 export const TEAMS: Record<Team, string> = {
   standard: 'Стандартная',
   potter: 'Гарри Поттер',
   marvel: 'Мстители и Marvel',
   dc: 'Лига Справедливости',
   got: 'Игра престолов',
+  twilight: 'Сумерки',
 }
 
 type Cast = Partial<Record<RoleKey, Partial<Role>>>
@@ -82,6 +84,8 @@ type Cast = Partial<Record<RoleKey, Partial<Role>>>
 const SKIN = 0xf0c8a0
 const FACE = ['', '', '..ssssssss..', '..ssssssss..'] // голова — ряды 2–3, туловище — 4–5, ноги — 6–7
 const ROBE = 0x4a4a5c // школьная мантия: темнее нельзя, пропадёт на тёмном терминале
+const PALE = 0xf2ece6 // кожа вампира
+const GOLD = 0xd4a017 // глаза Калленов: «вегетарианцы»
 
 /** Персонаж целиком: без шляпы и очков Clawd, всё лицо и костюм — в look. */
 const who = (label: string, inst: string, color: string, body: number, prop: Prop, look: Look, more: Partial<Role> = {}): Partial<Role> => ({
@@ -477,6 +481,109 @@ const CASTS: Record<Team, Cast> = {
       pal: { h: 0x3a3036, y: 0xd4a017 },
     }),
   },
+  twilight: {
+    foreman: who('Белла', 'Беллой', '#5F8FEF', 0x3b6fb0, 'apple', {
+      paint: FACE,
+      over: ['', '..hhhhhhhh..', '.hhhhhhhhhh.', '.h........h.', '.h........h.', '.h........h.'], // яблоко с обложки, голубая кофта
+      legs: 0x3b4a8c,
+      pal: { s: 0xf4e4d4, h: 0x5a3a24 },
+    }),
+    mechanic: who('Джейкоб', 'Джейкобом', '#C08A57', 0xa8704a, 'wrench', {
+      paint: [...FACE, '.k..........'], // без футболки, тату стаи на плече; чинит мотоциклы
+      legs: 0x3b4a8c,
+      over: ['', '..hhhhhhhh..', '.h........h.'],
+      pal: { s: 0xa8704a, h: 0x1b1b1b, k: 0x3a2418 },
+    }),
+    researcher: who('Эдвард', 'Эдвардом', '#E0823D', 0x5a5f6a, 'book', {
+      paint: FACE,
+      eyes: GOLD,
+      over: ['....hhh.....', '..hhhhhhhh..', '..h......h..'], // бронзовый вихор вверх
+      pal: { s: PALE, h: 0x9a5a2e },
+    }),
+    scout: who('Джеймс', 'Джеймсом', '#E5484D', 0x6b4a2e, 'binoculars', {
+      paint: FACE,
+      eyes: 0xe5484d,
+      over: ['', '..hhhhhhhh..', 'hh........h.', 'h...........'], // ищейка, хвост на затылке
+      pal: { s: PALE, h: 0xd8c08a },
+    }),
+    writer: who('Карлайл', 'Карлайлом', '#F2C230', 0xd8dce2, 'quill', {
+      paint: FACE, // белый халат доктора
+      eyes: GOLD,
+      over: ['', '..hhhhhhhh..', '..h.......h.'],
+      pal: { s: PALE, h: 0xe8d08a },
+    }),
+    designer: who('Элис', 'Элис', '#A98BEF', 0x6b3fa0, 'pencil', {
+      paint: FACE,
+      eyes: GOLD,
+      over: ['..h.h.h.h...', '..hhhhhhhh..', '.h........h.'], // короткие чёрные пёрышки
+      pal: { s: PALE, h: 0x1b1b1b },
+    }),
+    apprentice: who('Эммет', 'Эмметом', '#9FB4D8', 0x4a4f5a, 'bat', {
+      paint: FACE,
+      eyes: GOLD,
+      over: ['.h.h.h.h.h..', '..hhhhhhhh..'], // бита с бейсбола в грозу
+      pal: { s: PALE, h: 0x3a2a20 },
+    }),
+    artist: who('Джаспер', 'Джаспером', '#C08A57', 0x7a6a5a, 'palette', {
+      paint: FACE,
+      eyes: GOLD,
+      over: ['', '..hhhhhhhh..', '.hh......hh.', '.h........h.'],
+      pal: { s: PALE, h: 0xc8a050 },
+    }),
+    librarian: who('Аро', 'Аро', '#E5484D', 0x34343e, 'scroll', {
+      paint: FACE, // плащ Вольтури
+      eyes: 0xb0302a,
+      over: ['', '..hhhhhhhh..', '.hhhhhhhhhh.', '.h........h.', '.h........h.', '.h........h.'],
+      pal: { s: 0xf2f0ec, h: 0x1b1b1b },
+    }),
+    editor: who('Розали', 'Розали', '#F2C230', 0x9b1b30, 'mirror', {
+      paint: FACE,
+      eyes: GOLD,
+      over: ['', '..hhhhhhhh..', '.hhhhhhhhhh.', '.h........h.', '.h........h.', '.h........h.', '.h........h.'],
+      pal: { s: PALE, h: 0xf2d04a },
+    }),
+    planner: who('Чарли', 'Чарли', '#C08A57', 0x8a7a5a, 'rod', {
+      paint: [...FACE, '...y........'], // шериф Форкса: значок, усы, удочка
+      over: ['', '..hhhhhhhh..', '.h........h.', '', '....mmmm....'],
+      pal: { h: 0x5a3a24, m: 0x3a2418, y: 0xd4a017 },
+    }),
+    // сабагенты
+    guest0: who('Эсме', 'Эсме', '#5FB37A', 0x5f8f7a, 'tray', {
+      paint: FACE,
+      eyes: GOLD,
+      over: ['', '..hhhhhhhh..', '.hhhhhhhhhh.', '.h........h.', '.h........h.'],
+      pal: { s: PALE, h: 0x9a6a3a },
+    }),
+    guest1: who('Ренесми', 'Ренесми', '#E0823D', 0xe0d8d0, 'sprout', {
+      paint: FACE,
+      over: ['', '..hhhhhhhh..', '.hhhhhhhhhh.', '.h.h....h.h.', '.h.h....h.h.'], // бронзовые кудри
+      pal: { s: 0xf4e4d4, h: 0xa0582e },
+    }),
+    guest2: who('Джейн', 'Джейн', '#E5484D', 0x34343e, 'spark', {
+      paint: FACE,
+      eyes: 0xe5484d,
+      over: ['....hh......', '..hhhhhhhh..', '.h........h.'], // пучок, плащ Вольтури
+      pal: { s: 0xf2f0ec, h: 0xe8d08a },
+    }),
+    guest3: who('Виктория', 'Викторией', '#E0823D', 0x5a4a3a, 'flame', {
+      paint: FACE,
+      eyes: 0xe5484d,
+      over: ['.h.h.h.h.h..', 'hhhhhhhhhhh.', 'hh........hh', 'h..........h', 'h..........h'], // огненные кудри
+      pal: { s: PALE, h: 0xd2501e },
+    }),
+    guest4: who('Лоран', 'Лораном', '#C08A57', 0x8a7a6a, 'staff', {
+      paint: FACE,
+      eyes: 0xe5484d,
+      over: ['', '..hhhhhhhh..', '.h.h....h.h.', '.h.h....h.h.', '.h........h.'], // дреды
+      pal: { s: 0x7a4a30, h: 0x2a1a10 },
+    }),
+    guest5: who('Сет', 'Сетом', '#C08A57', 0xa8704a, 'wrench', {
+      paint: [...FACE, '.k..........'], // стая квилетов, как Джейкоб
+      legs: 0x5a4636,
+      over: ['', '..hhhhhhhh..'],
+      pal: { s: 0xa8704a, h: 0x1b1b1b, k: 0x3a2418 },
+    }),
+  },
 }
 
 // ponytail: одна изменяемая таблица — setTeam переписывает её на месте, и все ROLES[x] сразу видят новую команду
@@ -690,6 +797,57 @@ const PHRASES: Record<Team, [string, string][]> = {
     ['болтает с ', 'плетёт интриги с '],
     ['играет в мяч с ', 'фехтует с '],
   ],
+  twilight: [
+    ['запускает: ', 'заводит: '],
+    ['набирает команду', 'чинит мотоцикл'],
+    ['читает: ', 'читает мысли: '],
+    ['ищет, что прочитать', 'прислушивается к мыслям'],
+    ['ищет «', 'ловит мысли «'],
+    ['ищет файлы: ', 'ловит мысли: '],
+    ['правит: ', 'доводит до идеала: '],
+    ['правит блокнот: ', 'доводит до идеала: '],
+    ['пишет правку', 'смотрится в зеркало'],
+    ['пишет: ', 'выписывает рецепт: '],
+    ['пишет файл', 'надевает халат'],
+    ['гуглит: ', 'берёт след: '],
+    ['открывает: ', 'выслеживает: '],
+    ['составляет запрос', 'принюхивается'],
+    ['раздаёт задачу: ', 'просит Калленов: '],
+    ['пишет задание', 'собирает Калленов'],
+    ['достаёт инструкцию: ', 'листает архив Вольтури: '],
+    ['ищет инструмент', 'берёт за руку и узнаёт всё'],
+    ['обновляет план', 'обновляет сводку шерифа'],
+    ['составляет план', 'составляет протокол'],
+    ['ждёт ответа от вас', 'ждёт ответа, Беллз'],
+    ['готовит макет', 'подбирает макету наряд'],
+    ['готовит генерацию', 'нагоняет настроение'],
+    ['готовится', 'выходит из тени'],
+    ['читает задачу', 'слушает Карлайла'],
+    ['обдумывает результат', 'думает о вечности'],
+    ['смотрит за командой', 'смотрит за кланом'],
+    ['получил задание', 'почуял задание'],
+    ['сдал работу', 'сделано навеки'],
+    ['уходит домой', 'исчезает в лесу'],
+    ['спит', 'притворяется спящим'],
+    ['ест курочку', 'ест яблоко'],
+    ['пьёт кофе', 'пьёт кровь пумы'],
+    ['читает газету', 'читает «Грозовой перевал»'],
+    ['листает ленту', 'переписывается с Элис'],
+    ['играет в приставку', 'режется в приставку с Эмметом'],
+    ['летает на шарике', 'прыгает по верхушкам елей'],
+    ['поливает цветок', 'поливает цветы на поляне'],
+    ['медитирует', 'слушает мысли Форкса'],
+    ['качает гантели', 'меряется силой с Эмметом'],
+    ['жонглирует', 'жонглирует яблоками'],
+    ['рисует картину', 'рисует эскиз платья'],
+    ['танцует', 'танцует на выпускном'],
+    ['моется в душе', 'сверкает на солнце'],
+    ['гуляет', 'бродит по лесам Форкса'],
+    ['слушает музыку', 'слушает Muse'],
+    ['играет на гитаре', 'играет колыбельную Беллы'],
+    ['болтает с ', 'шепчется с '],
+    ['играет в мяч с ', 'играет в бейсбол с '],
+  ],
 }
 
 /** Фраза голосом текущей команды. */
@@ -714,6 +872,7 @@ export function teamOf(arg: string): Team | undefined {
   if (/^(3|мстител|марвел|marvel|avengers)/.test(a)) return 'marvel'
   if (/^(4|dc|дс|лиг|справедлив|бэтмен|batman|justice)/.test(a)) return 'dc'
   if (/^(5|игр|престол|got|thrones|вестерос|westeros|старк)/.test(a)) return 'got'
+  if (/^(6|сумер|twilight|каллен|cullen|форкс|forks|белл|эдвард)/.test(a)) return 'twilight'
   return undefined
 }
 

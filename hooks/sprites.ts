@@ -105,6 +105,9 @@ const PROPS: Record<Exclude<Prop, 'bubble' | 'zzz'>, string[]> = {
   goblet: ['', '', '', 'GRRG', 'GRRG', '.GG.', 'GGGG'], // кубок вина
   icespear: ['', '....L', '...L.', '..L..', '.L...', 'L....'],
   ladder: ['', 'H..H', 'HHHH', 'H..H', 'HHHH', 'H..H'], // «хаос — это лестница»
+  apple: ['', '', '..g.', '.RR.', 'RRRR', 'RRRR', '.RR.'], // яблоко с обложки «Сумерек»
+  mirror: ['', '.GGG.', 'GLWLG', 'GLLLG', '.GGG.', '..H..', '..H..'],
+  rod: ['', '...HH', '..H.W', '.H..W', 'H...W', '....R'], // удочка Чарли с поплавком
 }
 
 type Px = (number | null)[][]
@@ -420,10 +423,11 @@ type Art = {
   BALL: string[]
   JUGGLE: PalKey[]
   BLOOM: PalKey // чем цветёт цветок
-  FLY: 'balloon' | 'broom' | 'jets' | 'cape' | 'dragon'
-  ARRIVE: 'run' | 'apparate' | 'fly' | 'speed' | 'snow' // как приходят в полосу и уходят из неё
+  FLY: 'balloon' | 'broom' | 'jets' | 'cape' | 'dragon' | 'pine'
+  ARRIVE: 'run' | 'apparate' | 'fly' | 'speed' | 'snow' | 'blur' // как приходят в полосу и уходят из неё
+  SPARKLE: boolean // вместо душа сверкает на солнце
 }
-const BASE: Art = { DRUM, MUG, NEWS, NEWS_NEXT, PHONE, CONSOLE, BALL, JUGGLE: ['R', 'Y', 'g'], BLOOM: 'P', FLY: 'balloon', ARRIVE: 'run' }
+const BASE: Art = { DRUM, MUG, NEWS, NEWS_NEXT, PHONE, CONSOLE, BALL, JUGGLE: ['R', 'Y', 'g'], BLOOM: 'P', FLY: 'balloon', ARRIVE: 'run', SPARKLE: false }
 const ART: Record<Team, Partial<Art>> = {
   standard: {},
   potter: {
@@ -468,6 +472,18 @@ const ART: Record<Team, Partial<Art>> = {
     BLOOM: 'R', // красные листья чардрева
     FLY: 'dragon',
     ARRIVE: 'snow',
+  },
+  twilight: {
+    DRUM: ['..g.', '.RR.', 'RRRR', '.RR.'], // яблоко
+    MUG: ['...W', 'GRRW', 'GRRG', '.GG.'], // кровь в стакане с трубочкой
+    NEWS: ['HHHHHHH', 'HWWHWWH', 'HKWHKWH', 'HWWHWWH', 'HKWHWKH', 'HHHHHHH'], // «Грозовой перевал»
+    NEWS_NEXT: ['HHHHHHH', 'HWKHWWH', 'HWWHKWH', 'HKWHWWH', 'HWWHWKH', 'HHHHHHH'],
+    BALL: ['WR', 'RW'], // бейсбольный мяч
+    JUGGLE: ['R', 'g', 'R'], // яблоки
+    BLOOM: 'v', // полевые цветы на поляне
+    FLY: 'pine',
+    ARRIVE: 'blur',
+    SPARKLE: true,
   },
 }
 const art = (): Art => ({ ...BASE, ...ART[team()] })
@@ -535,7 +551,7 @@ const BALL_FOLLOW: ([number, number] | null)[] = [
 /** Свободное время: спит, ест, пьёт кофе, гуляет, моется, читает, играет с соседом. */
 function rest(px: Px, r: Role, t: number, body: number, scene: Scene): Px {
   const tt = scene.tt ?? t
-  const { DRUM, MUG, NEWS, NEWS_NEXT, PHONE, CONSOLE, BALL, JUGGLE: STONES, BLOOM, FLY } = art()
+  const { DRUM, MUG, NEWS, NEWS_NEXT, PHONE, CONSOLE, BALL, JUGGLE: STONES, BLOOM, FLY, SPARKLE } = art()
   switch (scene.pastime ?? 'sleep') {
     case 'sleep': {
       // дышит: каждые ~450 мс тело оседает на пиксель и поднимается обратно
@@ -572,6 +588,14 @@ function rest(px: Px, r: Role, t: number, body: number, scene: Scene): Px {
       return shift(px, WALK[i] ?? 0)
     }
     case 'shower': {
+      if (SPARKLE) {
+        // вампир на солнце: кожа искрится бриллиантами
+        drawBody(px, r, body, { eyes: EYES_SHUT, arms: 'up' })
+        stamp(px, ['.Y.', 'YYY', '.Y.'], 16, 0)
+        for (const [x, y] of [[3, 2], [8, 2], [5, 4], [9, 5], [2, 5], [6, 3], [4, 5], [7, 4]] as const)
+          if ((x + y + t) % 3 === 0) dot(px, x, y, (x + t) % 2 ? PAL.L : PAL.W)
+        return px
+      }
       drawBody(px, r, body, { eyes: EYES_SHUT, hat: false })
       stamp(px, ['GGGGGGDDDD'], 3, 0) // лейка и труба
       for (let y = 0; y < 8; y++) dot(px, 12, y, PAL.D)
@@ -639,6 +663,12 @@ function rest(px: Px, r: Role, t: number, body: number, scene: Scene): Px {
         const D = { R: 0xb0302a } // тело темнее крыла
         stamp(px, ['................RRY', '...............RRRRR', 'RR..RRRRRRRRRRRRR', '..RRRRRRRRRRRR'], 0, 4, D) // голова, шея, тело, хвост
         stamp(px, by ? ['....R', '..RRR', '.RRRR', 'RRRR.'] : ['RRRR.', '.RRRR', '..RRR'], 10, by ? 0 : 5) // крыло
+        return px
+      }
+      if (FLY === 'pine') {
+        // держится за верхушку ели, ель качается
+        drawBody(px, r, body, { sink: by ? -1 : 0, arms: 'right' })
+        stamp(px, ['...g...', '..ggg..', '.ggggg.', '..ggg..', '.ggggg.', 'ggggggg', '...H...', '...H...'], 11 + by, 0, { g: 0x2e6b45 })
         return px
       }
       if (FLY === 'jets') {
@@ -838,7 +868,8 @@ export function pose(role: RoleKey, status: Status, t: number, body?: number, m?
     const e = 1 - easeOut(q) // остаток пути: прилетает справа сверху и садится
     return shift(lift(px, Math.round(3 * e)), Math.round(SPRITE_COLS * e))
   }
-  if (style === 'speed') {
+  if (style === 'speed' || style === 'blur') {
+    const [c1, c2] = style === 'blur' ? [PAL.G, PAL.D] : [PAL.Y, PAL.R]
     // молния: проносится за треть секунды, позади жёлто-красный след, потом искрит
     if (k < 0.05) return still()
     if (m.out && q < 0.12) {
@@ -849,7 +880,7 @@ export function pose(role: RoleKey, status: Status, t: number, body?: number, m?
     if (p >= 1 && m.out) return px
     if (p >= 1) {
       const f = still()
-      if (q < 0.7) for (const [x, y] of [[11, 1 + beat], [0, 3 - beat], [12, 6]] as const) dot(f, x, y, PAL.Y)
+      if (q < 0.7) for (const [x, y] of [[11, 1 + beat], [0, 3 - beat], [12, 6]] as const) dot(f, x, y, style === 'blur' ? PAL.W : PAL.Y)
       return f
     }
     drawBody(px, r, b, { step: beat === 1, eyes: m.out ? LOOK_RIGHT : LOOK_LEFT })
@@ -857,8 +888,8 @@ export function pose(role: RoleKey, status: Status, t: number, body?: number, m?
     const moved = shift(px, dx)
     const [from, to] = m.out ? [0, dx] : [11 + dx, W - 1]
     for (let x = from; x <= to; x++) {
-      if ((x + beat) % 3) dot(moved, x, 3, PAL.Y)
-      if ((x + beat) % 2) dot(moved, x, 5, PAL.R)
+      if ((x + beat) % 3) dot(moved, x, 3, c1)
+      if ((x + beat) % 2) dot(moved, x, 5, c2)
     }
     return moved
   }
