@@ -108,6 +108,12 @@ const PROPS: Record<Exclude<Prop, 'bubble' | 'zzz'>, string[]> = {
   apple: ['', '', '..g.', '.RR.', 'RRRR', 'RRRR', '.RR.'], // яблоко с обложки «Сумерек»
   mirror: ['', '.GGG.', 'GLWLG', 'GLLLG', '.GGG.', '..H..', '..H..'],
   rod: ['', '...HH', '..H.W', '.H..W', 'H...W', '....R'], // удочка Чарли с поплавком
+  lute: ['', '....H', '...H.', 'YYH..', 'YYYY.', '.YY..'], // лютня Лютика, гитара Фиби
+  mic: ['', '', '..KK', '..KK', '...G', '..G..', '.G...'],
+  parasol: ['', '.YYY.', 'YYYYY', '..H..', '..H..', '.HH..'], // жёлтый зонт
+  cup: ['', '', '', 'WWW.', 'WWWW', 'WWW.'], // кружка «Central Perk»
+  sandwich: ['', '', '', '.bbbb', 'gRYgR', '.bbbb'],
+  banana: ['', '', '...Y', '..YY', '.YY.', 'YY..'],
 }
 
 type Px = (number | null)[][]
@@ -424,10 +430,10 @@ type Art = {
   JUGGLE: PalKey[]
   BLOOM: PalKey // чем цветёт цветок
   FLY: 'balloon' | 'broom' | 'jets' | 'cape' | 'dragon' | 'pine'
-  ARRIVE: 'run' | 'apparate' | 'fly' | 'speed' | 'snow' | 'blur' // как приходят в полосу и уходят из неё
-  SPARKLE: boolean // вместо душа сверкает на солнце
+  ARRIVE: 'run' | 'apparate' | 'portal' | 'fly' | 'speed' | 'snow' | 'rain' | 'blur' // как приходят в полосу и уходят из неё
+  SHOWER: 'water' | 'sparkle' | 'tub' // душ, сверкание на солнце или бадья
 }
-const BASE: Art = { DRUM, MUG, NEWS, NEWS_NEXT, PHONE, CONSOLE, BALL, JUGGLE: ['R', 'Y', 'g'], BLOOM: 'P', FLY: 'balloon', ARRIVE: 'run', SPARKLE: false }
+const BASE: Art = { DRUM, MUG, NEWS, NEWS_NEXT, PHONE, CONSOLE, BALL, JUGGLE: ['R', 'Y', 'g'], BLOOM: 'P', FLY: 'balloon', ARRIVE: 'run', SHOWER: 'water' }
 const ART: Record<Team, Partial<Art>> = {
   standard: {},
   potter: {
@@ -483,7 +489,37 @@ const ART: Record<Team, Partial<Art>> = {
     BLOOM: 'v', // полевые цветы на поляне
     FLY: 'pine',
     ARRIVE: 'blur',
-    SPARKLE: true,
+    SHOWER: 'sparkle',
+  },
+  witcher: {
+    DRUM: ['.HHH.', 'HbbbH', '.HHH.'], // миска похлёбки
+    MUG: ['WWW.', 'YYYY', 'YYY.'], // спирт в кружке
+    NEWS: ['HHHHHHH', 'HbbbbbH', 'HbKKbbH', 'HbbbbbH', 'HbKbKbH', 'HHHHHHH'], // доска объявлений
+    NEWS_NEXT: ['HHHHHHH', 'HbbbbbH', 'HbKbKbH', 'HbbbbbH', 'HbKKbbH', 'HHHHHHH'],
+    CONSOLE: ['WWW.WWW', 'WRW.WgW', 'WWW.WWW'], // гвинт
+    BALL: ['W.', '.W'], // блеск стали
+    BLOOM: 'v', // сирень и крыжовник
+    FLY: 'dragon',
+    ARRIVE: 'portal',
+    SHOWER: 'tub',
+  },
+  himym: {
+    DRUM: ['.HHH.', 'gYgYg', 'HHHHH', '.HHH.'], // бургер
+    MUG: ['WWW.', 'YYYY', 'YYY.'], // пиво в «Макларенс»
+    ARRIVE: 'rain',
+  },
+  friends: {
+    DRUM: ['bbbbb', 'gRYgR', 'bbbbb'], // сэндвич Джоуи
+    MUG: ['WWW.', 'WWWW', 'WWW.'], // большая кружка «Central Perk»
+    BALL: ['.H.', 'HHH', '.H.'], // мяч «Кубка Геллеров»
+    JUGGLE: ['Y', 'Y', 'Y'], // апельсины
+  },
+  nrk: {
+    DRUM: ['.YYY.', 'YYYYY', '.HHH.'], // мамин пирожок
+    NEWS: ['PPPPPPP', 'PWWWWWP', 'PWKKWWP', 'PWWWWWP', 'PWKWKWP', 'PPPPPPP'], // Катин дневник
+    NEWS_NEXT: ['PPPPPPP', 'PWKWKWP', 'PWWWWWP', 'PWKKWWP', 'PWWWWWP', 'PPPPPPP'],
+    BALL: ['WW', 'WW'], // записка комочком
+    JUGGLE: ['W', 'W', 'W'], // отчёты
   },
 }
 const art = (): Art => ({ ...BASE, ...ART[team()] })
@@ -551,7 +587,7 @@ const BALL_FOLLOW: ([number, number] | null)[] = [
 /** Свободное время: спит, ест, пьёт кофе, гуляет, моется, читает, играет с соседом. */
 function rest(px: Px, r: Role, t: number, body: number, scene: Scene): Px {
   const tt = scene.tt ?? t
-  const { DRUM, MUG, NEWS, NEWS_NEXT, PHONE, CONSOLE, BALL, JUGGLE: STONES, BLOOM, FLY, SPARKLE } = art()
+  const { DRUM, MUG, NEWS, NEWS_NEXT, PHONE, CONSOLE, BALL, JUGGLE: STONES, BLOOM, FLY, SHOWER } = art()
   switch (scene.pastime ?? 'sleep') {
     case 'sleep': {
       // дышит: каждые ~450 мс тело оседает на пиксель и поднимается обратно
@@ -588,7 +624,14 @@ function rest(px: Px, r: Role, t: number, body: number, scene: Scene): Px {
       return shift(px, WALK[i] ?? 0)
     }
     case 'shower': {
-      if (SPARKLE) {
+      if (SHOWER === 'tub') {
+        // Геральт в бадье: сидит по грудь в воде, над водой пар
+        drawBody(px, r, body, { eyes: Math.floor(t / 8) % 2 ? EYES_SHUT : undefined, sink: 2, hat: false })
+        stamp(px, ['HLLLLLLLLLLH', '.HHHHHHHHHH.'], 0, 6)
+        for (const x of [3, 7, 10]) dot(px, x, 1 + ((t + x) % 3), PAL.G)
+        return px
+      }
+      if (SHOWER === 'sparkle') {
         // вампир на солнце: кожа искрится бриллиантами
         drawBody(px, r, body, { eyes: EYES_SHUT, arms: 'up' })
         stamp(px, ['.Y.', 'YYY', '.Y.'], 16, 0)
@@ -843,17 +886,19 @@ export function pose(role: RoleKey, status: Status, t: number, body?: number, m?
   const beat = Math.floor(Date.now() / 90) % 2
   const px = blank()
   const style = m.walk ? 'run' : art().ARRIVE
-  if (style === 'apparate') {
+  if (style === 'apparate' || style === 'portal') {
+    // портал чародейки — та же вспышка, но фиолетовая
+    const sw = style === 'portal' ? { G: PAL.v, W: 0xc8a8ff, Y: PAL.v } : undefined
     if (k >= 0.85) return px
     if (k >= 0.6) {
-      stamp(px, CLOUD, 0, 0)
-      stamp(px, FLASH, 0, 0)
+      stamp(px, CLOUD, 0, 0, sw)
+      stamp(px, FLASH, 0, 0, sw)
       return px
     }
     const f = still()
-    if (k >= 0.35) stamp(f, CLOUD, 0, 0)
+    if (k >= 0.35) stamp(f, CLOUD, 0, 0, sw)
     else if (k >= 0.08 && m.out) return shift(f, beat) // крутанулся на месте перед хлопком
-    else if (k >= 0.08) stamp(f, WISPS, 0, 0) // дым рассеивается
+    else if (k >= 0.08) stamp(f, WISPS, 0, 0, sw) // дым рассеивается
     return f
   }
   if (style === 'fly') {
@@ -894,10 +939,10 @@ export function pose(role: RoleKey, status: Status, t: number, body?: number, m?
     return moved
   }
   const ran = runPose(px, r, b, m, q, beat)
-  if (style === 'snow') {
-    // идут сквозь метель: «Зима близко»
-    const tick = Math.floor(Date.now() / 160)
-    for (let i = 0; i < 6; i++) dot(ran, (i * 7 + tick) % W, (i * 3 + tick) % H, PAL.W)
+  if (style === 'snow' || style === 'rain') {
+    // «Престолы» идут сквозь метель, «Как я встретил вашу маму» — под дождём
+    const tick = Math.floor(Date.now() / (style === 'rain' ? 80 : 160))
+    for (let i = 0; i < 6; i++) dot(ran, (i * 7 + (style === 'rain' ? 0 : tick)) % W, (i * 3 + tick) % H, style === 'rain' ? PAL.L : PAL.W)
   }
   return ran
 }

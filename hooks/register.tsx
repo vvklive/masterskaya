@@ -345,8 +345,8 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'masterskaya',
-      description: 'Открыть мастерскую или сменить команду: стандартная, Гарри Поттер, Мстители, Лига Справедливости, Игра престолов, Сумерки',
-      argumentHint: '[стандарт | поттер | марвел | dc | престолы | сумерки]',
+      description: 'Открыть мастерскую или сменить команду: ' + Object.values(TEAMS).join(', '),
+      argumentHint: '[название или номер 1–' + Object.keys(TEAMS).length + ']',
     })
     const saved = (await $.store.get('team')) as Team | undefined
     if (saved && saved in TEAMS) setTeam(saved)
@@ -387,7 +387,7 @@ export const register: Register = on => {
   on('command.run', { command: 'masterskaya' }, async ($, e) => {
     if (e.args.trim()) {
       const t = teamOf(e.args)
-      if (!t) return { text: 'Такой команды нет. Есть: ' + Object.values(TEAMS).join(', ') + ' (/masterskaya 1–6).' }
+      if (!t) return { text: 'Такой команды нет. Есть: ' + Object.values(TEAMS).join(', ') + ' (/masterskaya 1–' + Object.keys(TEAMS).length + ').' }
       await pickTeam($, t)
       return { text: 'Команда: ' + TEAMS[t] + '.' }
     }
@@ -634,7 +634,7 @@ export const register: Register = on => {
       return (
         <Box flexDirection="column">
           {updateLine() ? <Text color="#5FB37A">{updateLine()}</Text> : null}
-          <Box flexDirection="row">
+          <Box flexDirection="row" flexWrap="wrap">
             {(Object.keys(TEAMS) as Team[]).map(k => (
               <Box key={k} marginRight={1}>
                 <Button key={'team-' + k} label={(k === team() ? '● ' : '') + TEAMS[k]} onPress={() => pickTeam($, k)} />
@@ -666,7 +666,7 @@ export const register: Register = on => {
             {updateLine()}
           </Text>
         ) : null}
-        <Box flexDirection="row">
+        <Box flexDirection="row" flexWrap="wrap">
           <Text dimColor>Команда: </Text>
           {(Object.keys(TEAMS) as Team[]).map(k => (
             <Box key={k} marginRight={1}>

@@ -259,7 +259,7 @@ test('сабагент сдал работу — постоял с галочк�
   expect(await named()).toBeUndefined()
 })
 
-test('ещё три вселенные: Лига Справедливости, Игра престолов и Сумерки — свои менеджеры, исполнители и слова', async ($, on) => {
+test('ещё вселенные: Лига, Престолы, Сумерки, Ведьмак, Как я встретил вашу маму, Друзья, Не родись красивой — свои менеджеры, исполнители и слова', async ($, on) => {
   const store = new Map<string, unknown>()
   const seen: Record<string, (string | undefined)[]> = {}
   let label = ''
@@ -268,7 +268,11 @@ test('ещё три вселенные: Лига Справедливости, �
   on('tool.call', async () => {
     const ui = await $.ui.mount({ ...BAND, props: { ...BAND.props, bodyColumns: 160 } } as never)
     const find = async (re: RegExp) => (await ui.find({ type: 'Text', text: re }))?.text
-    seen[label] = [await find(/^(Бэтмен|Дейенерис|Белла)$/), await find(/^(Супермен|Джон Сноу|Джейкоб)$/), await find(/(разгоняет|рубит|заводит): ls/)]
+    seen[label] = [
+      await find(/^(Бэтмен|Дейенерис|Белла|Геральт|Барни|Моника|Андрей Жданов)$/),
+      await find(/^(Супермен|Джон Сноу|Джейкоб|Цири|Тед|Чендлер|Катя Пушкарёва)$/),
+      await find(/(разгоняет|рубит|заводит|рассекает|чертит|обрабатывает данные|сводит баланс): ls/),
+    ]
     await ui.unmount()
     return { result: 'ok' }
   })
@@ -284,6 +288,19 @@ test('ещё три вселенные: Лига Справедливости, �
   expect((await $.command.run({ command: 'masterskaya', args: 'сумерки' } as never)).text).toBe('Команда: Сумерки.')
   await $.tool.call({ tool: 'Bash', command: 'ls' })
   expect(seen.twilight).toEqual(['Белла', 'Джейкоб', 'заводит: ls'])
+  const more: [string, string, string[]][] = [
+    ['ведьмак', 'Ведьмак', ['Геральт', 'Цири', 'рассекает: ls']],
+    ['как я встретил вашу маму', 'Как я встретил вашу маму', ['Барни', 'Тед', 'чертит: ls']],
+    ['друзья', 'Друзья', ['Моника', 'Чендлер', 'обрабатывает данные: ls']],
+    ['10', 'Не родись красивой', ['Андрей Жданов', 'Катя Пушкарёва', 'сводит баланс: ls']],
+  ]
+  for (const [arg, name, want] of more) {
+    label = arg
+    expect((await $.command.run({ command: 'masterskaya', args: arg } as never)).text).toBe('Команда: ' + name + '.')
+    await $.tool.call({ tool: 'Bash', command: 'ls' })
+    expect(seen[arg]).toEqual(want)
+  }
+  expect((await $.command.run({ command: 'masterskaya', args: '1' } as never)).text).toBe('Команда: Стандартная.') // «1» — не начало «10»
 })
 
 test('вышла новая версия — один тост на версию и строка в панели, пока не обновились', async ($, on) => {
