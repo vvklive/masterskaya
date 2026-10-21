@@ -130,6 +130,21 @@ test('в приложении Claude полоса рисует спрайты к
   expect(mech).toBe('Механик')
 })
 
+test('в приложении Claude спрайты не наезжают на подписи соседей: ряд переносится, блоки не сжимаются', async ($, on) => {
+  let boxes: { props: Record<string, unknown>; children: unknown[] }[] = []
+  on('tool.call', async () => {
+    const ui = await $.ui.mount({ ...BAND, surface: 'desktop' } as never)
+    boxes = await ui.findAll({ type: 'Box' })
+    await ui.unmount()
+    return { result: 'ok' }
+  })
+  await $.tool.call({ tool: 'Bash', command: 'ls' })
+  const holders = boxes.filter(b => b.children.some(c => (c as { type?: string })?.type === 'Svg'))
+  expect(holders.length).toBeGreaterThan(1) // менеджер и механик
+  for (const b of holders) expect(b.props.flexShrink).toBe(0)
+  expect(boxes[0]?.props.flexWrap).toBe('wrap')
+})
+
 test('после установки менеджер один раз просит звёздочку; «Не сейчас» убирает, второй раз не просит', async ($, on) => {
   // за движок: старт сессии, команды, часы, панель и хранилище между сессиями
   const store = new Map<string, unknown>()

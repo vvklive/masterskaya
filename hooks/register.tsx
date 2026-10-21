@@ -489,49 +489,53 @@ export const register: Register = on => {
     const main = list.find(w => w.id === MAIN) ?? fresh(MAIN, Date.now())
     const subs = list.filter(w => w.isSub)
     if (e.surface !== 'terminal') {
-      // приложение Claude: тот же ряд, спрайты картинками SVG, подписи справа от каждого
+      // приложение Claude: тот же ряд, спрайты картинками SVG, подписи справа от каждого.
+      // Ширину окна в пикселях мод не знает: каждый стоит своим блоком, блоки не сжимаются,
+      // а лишние переносятся на следующую строку — иначе сжатый блок рисует спрайт поверх подписи соседа.
       desktopSeen = true
       const { Box, Text, Svg, Link, Button } = $.ui.resolve(e)
       const lead = shown(main, list)
       const now = Date.now()
       const team = stageFor($, subs, now)
       return (
-        <Box flexDirection="row" alignItems="center">
-          <Svg source={svgOf(main, 0, list)} alt={`${ROLES[lead.role].label}: ${say(lead.action)}`} width={120} height={48} />
-          <Box flexDirection="column" marginLeft={1}>
-            <Text>
-              <Text bold color={ROLES[lead.role].color}>
-                {ROLES[lead.role].label}
+        <Box flexDirection="row" flexWrap="wrap" alignItems="center" columnGap={2} rowGap={1}>
+          <Box flexDirection="row" alignItems="center" flexShrink={0}>
+            <Svg source={svgOf(main, 0, list)} alt={`${ROLES[lead.role].label}: ${say(lead.action)}`} width={120} height={48} />
+            <Box flexDirection="column" marginLeft={1} width={32}>
+              <Text>
+                <Text bold color={ROLES[lead.role].color}>
+                  {ROLES[lead.role].label}
+                </Text>
+                <Text>: {say(lead.action)}</Text>
               </Text>
-              <Text>: {say(lead.action)}</Text>
-            </Text>
-            {starAsk ? (
-              <Box flexDirection="column">
-                <Text dimColor>Если нравимся — поставьте нам ★</Text>
-                <Link href={REPO} label="github.com/vvklive/masterskaya" />
-                <Box flexDirection="row">
-                  <Button key="star-yes" label="★ Поставил" onPress={() => thanks($)} />
-                  <Box marginLeft={1}>
-                    <Button key="star-no" label="Не сейчас" onPress={() => endStar($)} />
+              {starAsk ? (
+                <Box flexDirection="column">
+                  <Text dimColor>Если нравимся — поставьте нам ★</Text>
+                  <Link href={REPO} label="github.com/vvklive/masterskaya" />
+                  <Box flexDirection="row">
+                    <Button key="star-yes" label="★ Поставил" onPress={() => thanks($)} />
+                    <Box marginLeft={1}>
+                      <Button key="star-no" label="Не сейчас" onPress={() => endStar($)} />
+                    </Box>
                   </Box>
                 </Box>
-              </Box>
-            ) : thought ? (
-              <Text dimColor italic>
-                {tailFit(thought, 60, 2)}
-              </Text>
-            ) : null}
+              ) : thought ? (
+                <Text dimColor italic>
+                  {tailFit(thought, 28, 3)}
+                </Text>
+              ) : null}
+            </Box>
           </Box>
           {team.map(w => {
             const v = shown(w, list)
             return (
-              <Box key={w.id} flexDirection="row" alignItems="center" marginLeft={2}>
+              <Box key={w.id} flexDirection="row" alignItems="center" flexShrink={0}>
                 <Svg source={svgOf(w, list.indexOf(w), list, bandMove(w, now))} alt={`${ROLES[v.role].label}: ${say(w.action)}`} width={120} height={48} />
-                <Box flexDirection="column" marginLeft={1}>
-                  <Text bold color={ROLES[v.role].color}>
+                <Box flexDirection="column" marginLeft={1} width={16}>
+                  <Text bold color={ROLES[v.role].color} wrap="truncate">
                     {ROLES[v.role].label}
                   </Text>
-                  <Text dimColor>{tailFit(say(w.action), 24, 1)}</Text>
+                  <Text dimColor>{tailFit(say(w.action), 13, 2)}</Text>
                 </Box>
               </Box>
             )
